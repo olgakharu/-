@@ -176,6 +176,12 @@
     .habit .h-why { display: block; font-size: 12px; color: var(--text-mute); margin-top: 3px; line-height: 1.3; }
     .disc-streak { font-size: 14px; color: var(--gold-soft); font-weight: 600; }
     .disc-praise { margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--gold-dim); border: 1px solid rgba(217,180,106,0.4); color: var(--gold-soft); font-size: 14px; text-align: center; }
+    .prayer-card { padding: 26px 22px; text-align: center; }
+    .prayer-mark { font-size: 30px; margin-bottom: 12px; }
+    .prayer-title { font-size: 20px; font-weight: 700; color: var(--gold-soft); margin-bottom: 16px; letter-spacing: 0.3px; }
+    .prayer-text { font-size: 16px; line-height: 1.7; color: var(--text); font-style: italic; text-align: left; }
+    .prayer-text p { margin: 0 0 14px; }
+    .prayer-text p:last-child { margin-bottom: 0; color: var(--gold-soft); }
     .aff { font-size: 16px; font-style: italic; color: var(--gold-soft); }
 
     /* views */
@@ -238,7 +244,8 @@
           <div class="n"><span style="font-size:30px;color:var(--gold-soft)" id="weekCount">6</span><span>дней отмечено</span></div>
           <div class="dots" id="weekDots"></div>
         </div>
-        <button class="btn btn-ghost" style="margin-top:14px" onclick="openSummary()">Открыть итог дня и недели</button>
+        <button class="btn btn-ghost" style="margin-top:14px" onclick="openDaySummary()">Итог дня</button>
+        <button class="btn btn-ghost" onclick="openWeekSummary()">Итог недели</button>
       </div>
 
       <!-- дисциплина -->
@@ -304,20 +311,41 @@
         <div class="practice-title" id="resTitle"></div>
         <p class="practice-text" id="resText"></p>
       </div>
-      <button class="btn btn-primary" onclick="openSummary()">Посмотреть итог</button>
+      <button class="btn btn-primary" onclick="openDaySummary()">Посмотреть итог дня</button>
       <button class="btn btn-soft" onclick="go('home')">На главный экран</button>
     </div>
 
-    <!-- ============ SUMMARY ============ -->
-    <div id="view-summary" class="view">
+    <!-- ============ DAY SUMMARY ============ -->
+    <div id="view-day" class="view">
       <div class="top-bar">
         <button class="back" onclick="go('home')">‹</button>
-        <h2>Итог дня и недели</h2>
+        <h2>Итог дня</h2>
       </div>
-
       <div class="card">
         <div class="label">Сегодня</div>
         <div id="daySummary" class="practice-text"></div>
+        <div id="dayLock" class="razbor-lock hidden">
+          <div class="lock-emo">🌙</div>
+          <div class="lock-title">Итог дня откроется вечером</div>
+          <div class="lock-text" id="dayLockText"></div>
+        </div>
+      </div>
+
+      <div class="card glow hidden" id="dayRitualCard">
+        <div class="label">Настройка на ночь · отпускание</div>
+        <div class="practice-text" id="dayRitual"></div>
+        <button class="btn btn-ghost" style="margin-top:14px" onclick="openPrayer('evening')">🌙 Читать вечернюю молитву</button>
+      </div>
+
+      <button class="btn btn-ghost" onclick="openWeekSummary()">Открыть итог недели</button>
+      <button class="btn btn-soft" onclick="go('home')">На главный экран</button>
+    </div>
+
+    <!-- ============ WEEK SUMMARY ============ -->
+    <div id="view-week" class="view">
+      <div class="top-bar">
+        <button class="back" onclick="go('home')">‹</button>
+        <h2>Итог недели</h2>
       </div>
 
       <div class="card">
@@ -364,6 +392,7 @@
 
       <button class="btn btn-primary" onclick="go('home')">Хорошо, вернуться</button>
     </div>
+    <!-- /week -->
 
     <!-- ============ HINT ============ -->
     <div id="view-hint" class="view">
@@ -390,6 +419,18 @@
         <p class="q-sub" id="discIntro" style="margin:0 0 12px"></p>
         <div class="disc-streak" id="discStreak"></div>
       </div>
+      <div class="card glow">
+        <div class="label">Утренний ритуал</div>
+        <div class="q-title" style="margin-bottom:4px">🙏 Молитва после пробуждения</div>
+        <p class="q-sub" style="margin-bottom:14px">С неё начинается день — настрой на доверие вместо тревоги.</p>
+        <button class="btn btn-ghost" onclick="openPrayer('morning')">Читать молитву</button>
+      </div>
+      <div class="card">
+        <div class="label">Вечерний ритуал</div>
+        <div class="q-title" style="margin-bottom:4px">🌙 Молитва на завершение дня</div>
+        <p class="q-sub" style="margin-bottom:14px">Отпустить прожитое и восстановиться перед сном.</p>
+        <button class="btn btn-ghost" onclick="openPrayer('evening')">Читать молитву</button>
+      </div>
       <div class="card">
         <div class="disc-head">
           <div class="label" style="margin:0">Сегодня</div>
@@ -400,6 +441,21 @@
         <div class="disc-praise hidden" id="discPraise"></div>
       </div>
       <button class="btn btn-soft" onclick="go('home')">На главный экран</button>
+    </div>
+
+    <!-- ============ PRAYER ============ -->
+    <div id="view-prayer" class="view">
+      <div class="top-bar">
+        <button class="back" onclick="go('discipline')">‹</button>
+        <h2 id="prayerHead">Молитва</h2>
+      </div>
+      <div class="card glow prayer-card">
+        <div class="prayer-mark" id="prayerMark">🙏</div>
+        <div class="prayer-title" id="prayerTitle"></div>
+        <div class="prayer-text" id="prayerText"></div>
+      </div>
+      <button class="btn btn-ghost hidden" id="prayerSwitch" onclick="switchPrayer()">Другая молитва</button>
+      <button class="btn btn-soft" onclick="go('discipline')">Назад</button>
     </div>
   </div>
 
@@ -1194,6 +1250,12 @@
             "intro": "Тревогой не управляют борьбой — управляют опорой. Дисциплина здесь не про насилие над собой, а про ритм, который успокаивает нервную систему. Отмечай, что сделала сегодня — по одному шагу.",
             "habits": [
                   {
+                        "id": "prayer",
+                        "emoji": "🙏",
+                        "label": "Утренняя молитва после пробуждения",
+                        "why": "Утро задаёт вибрацию всего дня. Молитва настраивает ум на доверие и опору, а не на тревогу."
+                  },
+                  {
                         "id": "sleep",
                         "emoji": "🌅",
                         "label": "Подъём и отбой примерно в одно время",
@@ -1252,9 +1314,43 @@
                         "emoji": "🕊",
                         "label": "День без жалоб, критики и осуждения — к себе и другим",
                         "why": "Жалобы и осуждение держат нервную систему в режиме угрозы. Меньше оценок и ярлыков — меньше тревоги."
+                  },
+                  {
+                        "id": "evening_prayer",
+                        "emoji": "🌙",
+                        "label": "Вечерняя молитва — завершение дня",
+                        "why": "Отпустить прожитое перед сном — значит не унести тревогу в ночь. Тело восстанавливается только в покое."
                   }
             ]
-      }
+      },
+      "nightRituals": [
+            "Положи руку на грудь и выдохни день. Скажи: то, что сделано — сделано, остальное подождёт до утра. Ты имеешь право отдохнуть.",
+            "Мысленно пройди день и на каждое «надо было» ответь: я сделала, что могла из того состояния, в котором была. Этого достаточно.",
+            "Отпусти всех, кого носишь в голове. Каждому мысленно: спасибо, я тебя отпускаю до завтра. Ночь — не для чужих голосов.",
+            "Сделай пять длинных выдохов, каждый длиннее вдоха. С каждым отпускай одно напряжение: плечи, челюсть, живот, лоб, ладони.",
+            "Скажи телу: спасибо, что несло меня сегодня. Теперь можно всё отпустить. Ты в безопасности, день закончен.",
+            "Не бери завтрашние задачи в постель. Мысленно сложи их в коробку и поставь у двери — они дождутся утра.",
+            "Вспомни один момент сегодня, за который можно сказать «спасибо». Усни на нём, а не на тревоге.",
+            "Разожми ладони. Мы держим будущее сжатыми кулаками. Ночью можно разжать — жизнь удержит тебя сама.",
+            "Тревога любит будущее. Верни себя в сейчас: почувствуй одеяло, вес тела, темноту. Здесь и сейчас тебе ничего не угрожает.",
+            "Прости себе сегодняшнее несовершенство. Ты не обязана быть идеальной, чтобы заслужить отдых."
+      ],
+      "morningPrayers": [
+            {
+                  "title": "Священная молитва",
+                  "text": "О Высший Источник Света и Сознания, именуемый разными именами на разных языках, но Единый в своей сущности,\n\nПусть моё сердце откроется твоему присутствию во всём, что меня окружает. Направь моё сознание к гармонии, мои слова — к истине, мои действия — к благу всех существ.\n\nЯ благодарю за уроки, данные мне, за возможность расти через испытания, за свет, который всегда доступен в глубине моего существа.\n\nПусть я буду проводником мира, инструментом любви, свидетелем красоты твоего проявления во всех формах жизни.\n\nДа смогу я проживать свою судьбу с достоинством, мудростью и состраданием, помня о единстве всего сущего и вечном законе любви.\n\nДа будет так, на благо всех существ, во всех мирах и измерениях."
+            },
+            {
+                  "title": "Молитва изобилия",
+                  "text": "Вселенная (Боже, Источник Изобилия — выбери близкое обращение),\n\nЯ открываюсь сегодня потоку щедрости и возможностей. Прошу очистить моё сознание от тревоги о будущем и сожалений о прошлом. Наполни моё сердце глубоким доверием, а ум — кристальной ясностью.\n\nНастрой моё внутреннее состояние на вибрацию процветания, где я легко замечаю открывающиеся двери, различаю верные знаки и принимаю точные решения вовремя. Направь мои шаги к делам, проектам и встречам, которые служат благу, приносят честную прибыль и ощущение полноты.\n\nПомоги мне действовать смело, но без суеты, быть восприимчивой, но не пассивной. Пусть моя энергия и намерения притягивают нужные ресурсы, а каждое моё действие создаёт ценность и открывает новые пути для дохода.\n\nЯ благодарю за всё, что имею сейчас, и с радостным ожиданием принимаю всё, что приходит. Я в потоке. Мои решения своевременны. Мои возможности расширяются. Да будет так. И это уже есть."
+            }
+      ],
+      "eveningPrayers": [
+            {
+                  "title": "Молитва на завершение дня",
+                  "text": "Вселенная (Боже, Источник Покоя — выбери близкое обращение),\n\nДень подошёл к концу, и я отпускаю его. Всё, что было сегодня — сделанное и несделанное, сказанное и промолчавшее, — я оставляю в этом дне. Он завершён, и я благодарю его за всё, чему он меня научил.\n\nЯ отпускаю тревогу о том, что не успела, и вину за то, что было неидеально. Я сделала, что могла, из того состояния, в котором была. Этого достаточно.\n\nЯ отпускаю всех, кого носила сегодня в мыслях, все разговоры и споры. Каждому мысленно говорю: спасибо, я отпускаю тебя до утра. Моя ночь принадлежит только мне и покою.\n\nНаполни моё тело глубоким расслаблением, а ум — тишиной. Пусть каждая клетка восстановится за эту ночь, пусть сон вернёт мне силы, ясность и опору.\n\nЯ доверяю жизни то, что не в моих руках. Пока я сплю, мир держит меня. Я в безопасности. Я могу отпустить контроль и просто отдыхать.\n\nСпасибо за этот день. Спасибо за то, что я есть. Я засыпаю в мире с собой. Да будет так."
+            }
+      ]
 };
 
     var DATA = null;
@@ -1486,10 +1582,36 @@
     function byId(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i]; return null; }
     function esc(s) { return String(s == null ? '' : s); }
 
+    function fmtDate(dt) {
+      return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+    }
     function weekEntries() {
-      // последние 7 отметок по дате
-      var arr = entries.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
-      return arr.slice(-7);
+      // все отметки за последние 7 календарных дней (может быть несколько в день)
+      var d = new Date(); d.setDate(d.getDate() - 6);
+      var cut = fmtDate(d);
+      return entries.filter(function (e) { return e.date >= cut; });
+    }
+    function todayEntries() {
+      var t = today();
+      return entries.filter(function (e) { return e.date === t; });
+    }
+    function distinctDates(arr) {
+      var s = {};
+      arr.forEach(function (e) { s[e.date] = 1; });
+      return Object.keys(s);
+    }
+    // преобладающее состояние и самая напряжённая тема по набору отметок
+    function statOf(list) {
+      var sc = {}, tt = {};
+      list.forEach(function (e) {
+        sc[e.stateId] = (sc[e.stateId] || 0) + 1;
+        var s = byId(DATA.states, e.stateId);
+        var w = s ? (s.tension || 1) : 1;
+        tt[e.themeId] = (tt[e.themeId] || 0) + w;
+      });
+      var dom = null, dn = -1; for (var k in sc) if (sc[k] > dn) { dn = sc[k]; dom = k; }
+      var hot = null, hn = -1; for (var t in tt) if (tt[t] > hn) { hn = tt[t]; hot = t; }
+      return { domId: dom, hotId: hot };
     }
 
     // ---------- Рендер главного экрана ----------
@@ -1499,16 +1621,22 @@
       document.getElementById('greetLine').textContent = (DATA.app.greetingName || 'Привет') + '!';
       document.getElementById('authorFoot').textContent = DATA.app.author || '';
 
-      var entries = weekEntries();
-      var streak = entries.length;
-      document.getElementById('streakLine').textContent = streak > 0
-        ? 'Отмечаешься ' + streak + ' ' + plural(streak, ['день', 'дня', 'дней']) + ' подряд'
+      var wk = weekEntries();
+      var days = distinctDates(wk).length;
+      var marksToday = todayEntries().length;
+      document.getElementById('streakLine').textContent = days > 0
+        ? ('Ты отмечалась ' + days + ' ' + plural(days, ['день', 'дня', 'дней']) + ' на этой неделе' + (marksToday ? ' · сегодня ' + marksToday + ' ' + plural(marksToday, ['раз', 'раза', 'раз']) : ''))
         : 'Сделай первую отметку сегодня';
-      document.getElementById('weekCount').textContent = streak;
+      document.getElementById('weekCount').textContent = days;
 
-      // точки недели (7)
+      // точки недели (7) — по дням, где была хотя бы одна отметка
+      var dset = {};
+      wk.forEach(function (e) { dset[e.date] = 1; });
       var dots = '';
-      for (var i = 0; i < 7; i++) dots += '<div class="dot' + (i < Math.min(streak, 7) ? ' on' : '') + '"></div>';
+      for (var i = 6; i >= 0; i--) {
+        var dd = new Date(); dd.setDate(dd.getDate() - i);
+        dots += '<div class="dot' + (dset[fmtDate(dd)] ? ' on' : '') + '"></div>';
+      }
       document.getElementById('weekDots').innerHTML = dots;
 
       // офферы
@@ -1578,9 +1706,8 @@
     function finishMark() {
       if (!pick.stateId || !pick.themeId) return;
       var t = today();
-      todayEntry = { date: t, stateId: pick.stateId, themeId: pick.themeId };
-      // одна отметка в день: заменяем сегодняшнюю, если уже была
-      entries = entries.filter(function (e) { return e.date !== t; });
+      todayEntry = { date: t, stateId: pick.stateId, themeId: pick.themeId, ts: Date.now() };
+      // несколько отметок в день разрешены — просто добавляем
       entries.push(todayEntry);
       persistEntries();
       var sp = (DATA.statePractices && DATA.statePractices[pick.stateId]) || null;
@@ -1597,40 +1724,64 @@
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
 
-    // ---------- Итог дня и недели ----------
-    function openSummary() {
-      var entries = weekEntries();
-
-      // Итог дня
+    // ---------- Итог дня (открывается вечером) ----------
+    function openDaySummary() {
+      var te = todayEntries();
       var dayEl = document.getElementById('daySummary');
-      if (todayEntry) {
-        var st = byId(DATA.states, todayEntry.stateId);
-        var th = byId(DATA.themes, todayEntry.themeId);
-        dayEl.innerHTML = 'Сегодня ты отметила состояние <b>' + (st ? st.emoji + ' ' + esc(st.label) : '—') +
-          '</b> в теме <b>' + (th ? th.emoji + ' ' + esc(th.label) : '—') + '</b>.';
+      var dlock = document.getElementById('dayLock');
+      var DAY_HOUR = (DATA.app && DATA.app.dayHour) ? DATA.app.dayHour : 20;
+      var hour = new Date().getHours();
+      var unlocked = isDemo || hour >= DAY_HOUR;
+
+      if (te.length === 0) {
+        dlock.classList.add('hidden');
+        dayEl.classList.remove('hidden');
+        dayEl.innerHTML = 'Сегодня ты ещё не отмечалась. Отметь состояние — и вечером здесь появится итог дня.';
+      } else if (!unlocked) {
+        dayEl.classList.add('hidden');
+        dlock.classList.remove('hidden');
+        document.getElementById('dayLockText').textContent =
+          'Отмечай состояния в течение дня — уже ' + te.length + ' ' + plural(te.length, ['отметка', 'отметки', 'отметок']) +
+          '. Итог дня откроется вечером, после ' + DAY_HOUR + ':00.';
       } else {
-        dayEl.innerHTML = 'Сегодня ты ещё не отмечалась. Показываю итог по неделе ниже — а состояние дня появится, как только отметишься.';
+        dlock.classList.add('hidden');
+        dayEl.classList.remove('hidden');
+        var dstat = statOf(te);
+        var dSt = dstat.domId ? byId(DATA.states, dstat.domId) : null;
+        var dTh = dstat.hotId ? byId(DATA.themes, dstat.hotId) : null;
+        var lst = te.map(function (e) { var s = byId(DATA.states, e.stateId); return s ? s.emoji : '·'; }).join(' ');
+        dayEl.innerHTML = 'Сегодня ты отмечалась <b>' + te.length + ' ' + plural(te.length, ['раз', 'раза', 'раз']) + '</b>: ' + lst +
+          '<br>Чаще всего — <b>' + (dSt ? dSt.emoji + ' ' + esc(dSt.label) : '—') +
+          '</b>, больше всего напряжения — <b>' + (dTh ? dTh.emoji + ' ' + esc(dTh.label) : '—') + '</b>.';
       }
 
-      // Преобладающее состояние
-      var stateCount = {};
-      entries.forEach(function (e) { stateCount[e.stateId] = (stateCount[e.stateId] || 0) + 1; });
-      var domId = null, domN = -1;
-      for (var k in stateCount) if (stateCount[k] > domN) { domN = stateCount[k]; domId = k; }
-      var domSt = domId ? byId(DATA.states, domId) : null;
+      // Настройка на ночь — показываем вечером (когда итог открыт), одна на день
+      var rc = document.getElementById('dayRitualCard');
+      var nr = DATA.nightRituals || [];
+      if (unlocked && nr.length) {
+        var p = today().split('-');
+        var dnum = Math.floor(Date.UTC(+p[0], +p[1] - 1, +p[2]) / 86400000);
+        document.getElementById('dayRitual').textContent = nr[((dnum % nr.length) + nr.length) % nr.length];
+        rc.classList.remove('hidden');
+      } else {
+        rc.classList.add('hidden');
+      }
+
+      go('day');
+    }
+
+    // ---------- Итог недели (разбор темы раз в 7 дней) ----------
+    function openWeekSummary() {
+      var entries = weekEntries();
+
+      // Неделя: преобладающее состояние и самая напряжённая тема
+      var wstat = statOf(entries);
+      var domSt = wstat.domId ? byId(DATA.states, wstat.domId) : null;
       document.getElementById('domEmo').textContent = domSt ? domSt.emoji : '—';
       document.getElementById('domState').textContent = domSt ? domSt.label : '—';
       document.getElementById('cntBig').textContent = entries.length;
 
-      // Тема с наибольшим напряжением (сумма tension состояний по теме)
-      var themeTension = {};
-      entries.forEach(function (e) {
-        var s = byId(DATA.states, e.stateId);
-        var w = s ? (s.tension || 1) : 1;
-        themeTension[e.themeId] = (themeTension[e.themeId] || 0) + w;
-      });
-      var hotId = null, hotN = -1;
-      for (var t in themeTension) if (themeTension[t] > hotN) { hotN = themeTension[t]; hotId = t; }
+      var hotId = wstat.hotId;
       var hotTh = hotId ? byId(DATA.themes, hotId) : null;
 
       // Недельный разбор открывается раз в 7 дней
@@ -1666,7 +1817,7 @@
         }
       }
 
-      go('summary');
+      go('week');
     }
 
     // ---------- Внешние ссылки через Telegram ----------
@@ -1692,6 +1843,38 @@
       document.getElementById('hintSource').textContent = src ? '— ' + src : '';
       go('hint');
       try { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); } catch (e) {}
+    }
+
+    // ---------- Молитва (утро / вечер) ----------
+    var prayerIdx = 0;
+    var prayerSet = 'morning';
+    function prayerList() {
+      return (prayerSet === 'evening') ? ((DATA && DATA.eveningPrayers) || []) : ((DATA && DATA.morningPrayers) || []);
+    }
+    function openPrayer(kind) {
+      prayerSet = (kind === 'evening') ? 'evening' : 'morning';
+      prayerIdx = 0;
+      document.getElementById('prayerHead').textContent = prayerSet === 'evening' ? 'Вечерняя молитва' : 'Утренняя молитва';
+      document.getElementById('prayerMark').textContent = prayerSet === 'evening' ? '🌙' : '🙏';
+      renderPrayer();
+      go('prayer');
+    }
+    function switchPrayer() {
+      var pr = prayerList();
+      if (pr.length < 2) return;
+      prayerIdx = (prayerIdx + 1) % pr.length;
+      renderPrayer();
+    }
+    function renderPrayer() {
+      var pr = prayerList();
+      if (!pr.length) return;
+      var p = pr[prayerIdx] || pr[0];
+      document.getElementById('prayerTitle').textContent = p.title || '';
+      var html = String(p.text || '').split('\n\n').map(function (par) { return '<p>' + esc(par) + '</p>'; }).join('');
+      document.getElementById('prayerText').innerHTML = html;
+      var sw = document.getElementById('prayerSwitch');
+      if (pr.length > 1) sw.classList.remove('hidden'); else sw.classList.add('hidden');
+      window.scrollTo(0, 0);
     }
 
     // ---------- Раскрытие блока «Продолжить путь» ----------

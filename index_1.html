@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Барометр состояния</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: #0e0d13;
+      --bg-soft: #17151e;
+      --card: #1c1926;
+      --card-2: #221e2e;
+      --line: #2e2940;
+      --gold: #d9b46a;
+      --gold-soft: #e7cd93;
+      --gold-dim: rgba(217, 180, 106, 0.14);
+      --text: #f2eee6;
+      --text-dim: #a49db4;
+      --text-mute: #726c82;
+      --radius: 20px;
+      --shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; padding: 0; background: var(--bg); }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--text);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+      background:
+        radial-gradient(1200px 500px at 50% -10%, rgba(217,180,106,0.10), transparent 60%),
+        var(--bg);
+    }
+    .wrap { max-width: 480px; margin: 0 auto; padding: 22px 16px 40px; }
+
+    /* header */
+    .brand { text-align: center; margin: 6px 0 22px; }
+    .brand .kicker {
+      font-size: 12px; letter-spacing: 2.5px; text-transform: uppercase;
+      color: var(--gold); font-weight: 600;
+    }
+    .brand h1 {
+      font-size: 26px; margin: 6px 0 4px; font-weight: 700; letter-spacing: 0.3px;
+    }
+    .brand p { margin: 0; color: var(--text-dim); font-size: 14px; }
+
+    /* cards */
+    .card {
+      background: linear-gradient(180deg, var(--card-2), var(--card));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow);
+    }
+    .card.glow { border-color: rgba(217,180,106,0.35); }
+    .label {
+      font-size: 12px; letter-spacing: 1.6px; text-transform: uppercase;
+      color: var(--gold); font-weight: 600; margin-bottom: 10px;
+    }
+
+    /* streak */
+    .streak { display: flex; align-items: center; gap: 14px; }
+    .streak .flame {
+      width: 54px; height: 54px; flex: 0 0 54px; border-radius: 16px;
+      display: grid; place-items: center; font-size: 26px;
+      background: var(--gold-dim); border: 1px solid rgba(217,180,106,0.3);
+    }
+    .streak .txt strong { font-size: 17px; }
+    .streak .txt span { display: block; color: var(--text-dim); font-size: 13px; }
+
+    /* buttons */
+    .btn {
+      width: 100%; border: none; cursor: pointer; font-family: inherit;
+      border-radius: 16px; padding: 16px; font-size: 16px; font-weight: 600;
+      transition: transform .12s ease, filter .12s ease;
+    }
+    .btn:active { transform: scale(0.985); }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--gold-soft), var(--gold));
+      color: #241c0a; box-shadow: 0 8px 24px rgba(217,180,106,0.28);
+    }
+    .btn-ghost {
+      background: transparent; color: var(--gold);
+      border: 1px solid rgba(217,180,106,0.4);
+    }
+    .btn-soft { background: var(--card-2); color: var(--text); border: 1px solid var(--line); }
+    .btn + .btn { margin-top: 10px; }
+
+    .q-title { font-size: 18px; font-weight: 700; margin: 2px 0 4px; }
+    .q-sub { color: var(--text-dim); font-size: 14px; margin: 0 0 16px; }
+
+    /* chips grid */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .chip {
+      background: var(--card-2); border: 1px solid var(--line);
+      border-radius: 14px; padding: 14px 12px; cursor: pointer;
+      display: flex; align-items: center; gap: 10px; font-size: 15px;
+      color: var(--text); transition: border-color .12s, background .12s, transform .1s;
+    }
+    .chip:active { transform: scale(0.97); }
+    .chip.sel { border-color: var(--gold); background: var(--gold-dim); }
+    .chip .em { font-size: 20px; }
+
+    /* week mini */
+    .week-mini { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .week-mini .n { font-size: 30px; font-weight: 700; color: var(--gold-soft); line-height: 1; }
+    .week-mini .n span { font-size: 13px; color: var(--text-dim); font-weight: 400; display: block; margin-top: 4px; }
+    .dots { display: flex; gap: 6px; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--line); }
+    .dot.on { background: var(--gold); }
+
+    /* offers */
+    .offer { border-top: 1px solid var(--line); padding: 14px 0 4px; }
+    .offer:first-of-type { border-top: none; padding-top: 0; }
+    .offer h4 { margin: 0 0 4px; font-size: 15px; }
+    .offer p { margin: 0 0 10px; color: var(--text-dim); font-size: 13.5px; }
+    .offer a {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--gold); text-decoration: none; font-weight: 600; font-size: 14px;
+    }
+
+    /* practice / result */
+    .practice-emo { font-size: 44px; text-align: center; margin: 6px 0 10px; }
+    .practice-title { font-size: 19px; font-weight: 700; text-align: center; margin: 0 0 12px; }
+    .practice-text { color: var(--text); font-size: 15.5px; }
+
+    /* summary */
+    .stat-row { display: flex; gap: 12px; margin-bottom: 14px; }
+    .stat {
+      flex: 1; background: var(--card-2); border: 1px solid var(--line);
+      border-radius: 14px; padding: 14px; text-align: center;
+    }
+    .stat .big { font-size: 24px; }
+    .stat .cap { font-size: 12px; color: var(--text-mute); margin-top: 4px; }
+    .stat .val { font-size: 15px; font-weight: 600; margin-top: 2px; }
+    .hot {
+      background: var(--gold-dim); border: 1px solid rgba(217,180,106,0.4);
+      border-radius: 16px; padding: 16px; margin-bottom: 14px;
+    }
+    .hot .cap { font-size: 12px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--gold); font-weight: 600; }
+    .hot .theme { font-size: 20px; font-weight: 700; margin: 6px 0 2px; }
+    .block-h { font-size: 13px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gold); font-weight: 600; margin: 18px 0 6px; }
+    .aff { font-size: 16px; font-style: italic; color: var(--gold-soft); }
+
+    /* views */
+    .view { display: none; animation: fade .25s ease; }
+    .view.active { display: block; }
+    @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+    .top-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .back {
+      background: var(--card); border: 1px solid var(--line); color: var(--text);
+      width: 40px; height: 40px; border-radius: 12px; cursor: pointer; font-size: 18px;
+    }
+    .top-bar h2 { font-size: 18px; margin: 0; }
+
+    /* notice */
+    .notice {
+      background: rgba(217,180,106,0.10); border: 1px solid rgba(217,180,106,0.3);
+      color: var(--gold-soft); font-size: 12.5px; border-radius: 12px;
+      padding: 10px 12px; margin-bottom: 14px; text-align: center;
+    }
+    .hidden { display: none !important; }
+    .foot { text-align: center; color: var(--text-mute); font-size: 12px; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">
+      <div class="kicker">Барометр состояния</div>
+      <h1 id="appTitle">Барометр состояния</h1>
+      <p id="appSub">Загляни внутрь за 30 секунд</p>
+    </div>
+
+    <div id="notice" class="notice hidden"></div>
+
+    <!-- ============ HOME ============ -->
+    <div id="view-home" class="view active">
+      <!-- 1. приветствие + серия -->
+      <div class="card glow">
+        <div class="streak">
+          <div class="flame">🔥</div>
+          <div class="txt">
+            <strong id="greetLine">Привет!</strong>
+            <span id="streakLine">Отмечаешься 6 дней подряд</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. вопрос дня + главное действие -->
+      <div class="card">
+        <div class="label">Вопрос дня</div>
+        <div class="q-title" id="todayQ">Из какого состояния ты сегодня?</div>
+        <p class="q-sub" id="todayHint">Отметь состояние и тему — получишь практику под них.</p>
+        <button class="btn btn-primary" onclick="startMark()">Отметить состояние</button>
+      </div>
+
+      <!-- 4. моя неделя -->
+      <div class="card">
+        <div class="label">Моя неделя</div>
+        <div class="week-mini">
+          <div class="n"><span style="font-size:30px;color:var(--gold-soft)" id="weekCount">6</span><span>дней отмечено</span></div>
+          <div class="dots" id="weekDots"></div>
+        </div>
+        <button class="btn btn-ghost" style="margin-top:14px" onclick="openSummary()">Открыть итог дня и недели</button>
+      </div>
+
+      <!-- 5. продолжить путь -->
+      <div class="card">
+        <div class="label">Продолжить путь</div>
+        <div id="offers"></div>
+      </div>
+
+      <div class="foot" id="authorFoot"></div>
+    </div>
+
+    <!-- ============ MARK: STATE ============ -->
+    <div id="view-state" class="view">
+      <div class="top-bar">
+        <button class="back" onclick="go('home')">‹</button>
+        <h2>Что ты сейчас чувствуешь?</h2>
+      </div>
+      <div class="card">
+        <p class="q-sub">Выбери состояние, которое ближе всего прямо сейчас.</p>
+        <div class="grid" id="stateGrid"></div>
+      </div>
+    </div>
+
+    <!-- ============ MARK: THEME ============ -->
+    <div id="view-theme" class="view">
+      <div class="top-bar">
+        <button class="back" onclick="go('state')">‹</button>
+        <h2>Где сейчас напряжение?</h2>
+      </div>
+      <div class="card">
+        <p class="q-sub">Выбери тему, к которой это состояние относится больше всего.</p>
+        <div class="grid" id="themeGrid"></div>
+      </div>
+      <button class="btn btn-primary" id="confirmMark" disabled onclick="finishMark()" style="opacity:.5">Получить практику</button>
+    </div>
+
+    <!-- ============ RESULT (practice) ============ -->
+    <div id="view-result" class="view">
+      <div class="top-bar">
+        <button class="back" onclick="go('home')">‹</button>
+        <h2>Твоя практика</h2>
+      </div>
+      <div class="card glow">
+        <div class="practice-emo" id="resEmo">🌿</div>
+        <div class="practice-title" id="resTitle"></div>
+        <p class="practice-text" id="resText"></p>
+      </div>
+      <button class="btn btn-primary" onclick="openSummary()">Посмотреть итог</button>
+      <button class="btn btn-soft" onclick="go('home')">На главный экран</button>
+    </div>
+
+    <!-- ============ SUMMARY ============ -->
+    <div id="view-summary" class="view">
+      <div class="top-bar">
+        <button class="back" onclick="go('home')">‹</button>
+        <h2>Итог дня и недели</h2>
+      </div>
+
+      <div class="card">
+        <div class="label">Сегодня</div>
+        <div id="daySummary" class="practice-text"></div>
+      </div>
+
+      <div class="card">
+        <div class="label">Твоя неделя</div>
+        <div class="stat-row">
+          <div class="stat">
+            <div class="big" id="domEmo">🌿</div>
+            <div class="val" id="domState">—</div>
+            <div class="cap">чаще всего</div>
+          </div>
+          <div class="stat">
+            <div class="big" id="cntBig">6</div>
+            <div class="val">отметок</div>
+            <div class="cap">за неделю</div>
+          </div>
+        </div>
+
+        <div class="hot">
+          <div class="cap">Больше всего напряжения</div>
+          <div class="theme" id="hotTheme">💰 Деньги</div>
+          <div style="color:var(--text-dim);font-size:13.5px" id="hotHint">Эта тема забирала у тебя больше всего сил.</div>
+        </div>
+
+        <div class="block-h">Аффирмация</div>
+        <div class="aff" id="hotAff"></div>
+
+        <div class="block-h">Практика</div>
+        <div class="practice-text" id="hotPractice"></div>
+
+        <div class="block-h">Упражнение</div>
+        <div class="practice-text" id="hotExercise"></div>
+      </div>
+
+      <button class="btn btn-primary" onclick="go('home')">Хорошо, вернуться</button>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Telegram WebApp ----------
+    var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    if (tg) {
+      try { tg.ready(); tg.expand(); } catch (e) {}
+    }
+
+    // ---------- Fallback data (чтобы прототип не был пустым, если data.json не загрузился) ----------
+    var FALLBACK = {
+      "app": {
+            "title": "Барометр состояния",
+            "subtitle": "Загляни внутрь за 30 секунд",
+            "greetingName": "Привет",
+            "author": "Ольга Хару · психолог, расстановщик"
+      },
+      "states": [
+            {
+                  "id": "trevoga",
+                  "label": "Тревога",
+                  "emoji": "🌫",
+                  "tension": 4
+            },
+            {
+                  "id": "pustota",
+                  "label": "Пустота",
+                  "emoji": "🕳",
+                  "tension": 4
+            },
+            {
+                  "id": "zlost",
+                  "label": "Злость",
+                  "emoji": "🔥",
+                  "tension": 4
+            },
+            {
+                  "id": "szhatie",
+                  "label": "Сжатие",
+                  "emoji": "🪢",
+                  "tension": 4
+            },
+            {
+                  "id": "rasshirenie",
+                  "label": "Расширение",
+                  "emoji": "🌅",
+                  "tension": 1
+            },
+            {
+                  "id": "strah",
+                  "label": "Страх",
+                  "emoji": "🫥",
+                  "tension": 5
+            },
+            {
+                  "id": "vina",
+                  "label": "Вина",
+                  "emoji": "🪨",
+                  "tension": 3
+            },
+            {
+                  "id": "spokoystvie",
+                  "label": "Спокойствие",
+                  "emoji": "🌿",
+                  "tension": 1
+            },
+            {
+                  "id": "podyom",
+                  "label": "Подъём",
+                  "emoji": "✨",
+                  "tension": 1
+            }
+      ],
+      "themes": [
+            {
+                  "id": "money",
+                  "label": "Деньги",
+                  "emoji": "💰"
+            },
+            {
+                  "id": "relations",
+                  "label": "Отношения",
+                  "emoji": "💞"
+            },
+            {
+                  "id": "parents",
+                  "label": "Родители",
+                  "emoji": "🌳"
+            },
+            {
+                  "id": "body",
+                  "label": "Тело и психосоматика",
+                  "emoji": "🫀"
+            },
+            {
+                  "id": "trust",
+                  "label": "Доверие миру",
+                  "emoji": "🌊"
+            },
+            {
+                  "id": "selfworth",
+                  "label": "Самоценность",
+                  "emoji": "👑"
+            },
+            {
+                  "id": "boundaries",
+                  "label": "Личные границы",
+                  "emoji": "🚪"
+            }
+      ],
+      "statePractices": {
+            "trevoga": {
+                  "title": "Тревога всегда про будущее, которого ещё нет",
+                  "text": "Так. Поставь стопы на пол и сделай три выдоха длиннее вдоха. Тело успокаивается не от мыслей, а от опоры. Верни его в ту точку, где ты сейчас находишься. Здесь, в этой комнате, тебе ничего не угрожает."
+            },
+            "pustota": {
+                  "title": "Пустота приходит туда, где долго жила из «надо»",
+                  "text": "Не заставляй себя срочно наполниться. Спроси тихо: чего я себе давно не давала. Первое, что всплывёт, — и есть ответ. Дай это себе сегодня хотя бы в малом."
+            },
+            "zlost": {
+                  "title": "Злость показывает, где тебя нарушили",
+                  "text": "Её не надо гасить — её надо услышать. Договори до конца фразу: для меня недопустимо, когда… Это не про то, чтобы взорваться. Это про то, чтобы вернуть себе границу."
+            },
+            "szhatie": {
+                  "title": "Сжатие — тело держит то, что ты не отпускаешь",
+                  "text": "Так. Найди, где именно сжато — челюсть, плечи, живот. Не борись с этим, просто положи туда внимание и чуть удлини выдох. Сжатие уходит не от усилия, а когда тело чувствует, что держать больше не нужно. Разреши ему это на один выдох."
+            },
+            "rasshirenie": {
+                  "title": "Расширение — состояние, из которого видно больше вариантов",
+                  "text": "Побудь в нём чуть дольше, не спеши закрываться. Заметь телом, как стало больше воздуха, как отпустило грудь и плечи. Из расширения решения приходят сами — здесь ты видишь пространство вариантов, а не одну узкую дверь. Запомни это состояние, к нему можно возвращаться."
+            },
+            "strah": {
+                  "title": "Страх — это память, а не факт",
+                  "text": "Спроси себя: сколько мне лет в этом страхе. Часто пугается не взрослая, а маленькая часть внутри. Положи руку на грудь и скажи ей: я рядом. Взрослая ты сильнее, чем кажется в эту минуту."
+            },
+            "vina": {
+                  "title": "Вина — чаще про чужие правила, чем про твой вред",
+                  "text": "Раздели две вещи: я причинила реальный вред — или я просто не совпала с чужими ожиданиями. Почти всегда второе. Ты не обязана быть удобной для всех. Сегодня побудь на своей стороне хотя бы один раз."
+            },
+            "spokoystvie": {
+                  "title": "Спокойствие — это ресурс, запомни его телом",
+                  "text": "Замри на десять секунд и запомни телом, как это. Где мягко, где тепло, где отпустило. Это твоя точка возврата. В следующий раз в буре ты вспомнишь не слова, а именно это состояние — дом внутри."
+            },
+            "podyom": {
+                  "title": "Подъём — момент для шага",
+                  "text": "На подъёме легче всего отложить важное на потом. Сделай наоборот: один маленький шаг к тому, что давно откладываешь. Из этого состояния действия получаются лёгкими и точными — используй его, пока оно есть."
+            }
+      },
+      "themeContent": {
+            "money": {
+                  "affirmation": "Я разрешаю себе брать деньги за то, что делаю.",
+                  "practice": "Вспомни первую фразу про деньги, которую слышала в детстве — «деньги трудом», «не жили богато, нечего начинать». Скажи вслух: это было про них, а не про меня. Дальше ты выбираешь другую стратегию.",
+                  "exercise": "Выпиши три суммы: сколько берёшь сейчас, сколько хочешь брать, сколько боишься назвать вслух. Разница между второй и третьей — твоя зона про самоценность в деньгах."
+            },
+            "relations": {
+                  "affirmation": "Я выбираю из наполненности, а не из страха остаться одной.",
+                  "practice": "Спроси себя: чего я жду от другого, что могу дать себе сама. Дай это себе сегодня хотя бы в малом. Из сытости выбирают спокойно, из голода — кого попало.",
+                  "exercise": "Нарисуй два круга: «я» и «мы». Отметь, где они слились в один. Верни в свой круг то, что растворилось, — дело, интерес, людей, время."
+            },
+            "parents": {
+                  "affirmation": "Я беру у рода жизнь и силу, обиды оставляю там, где они возникли.",
+                  "practice": "Мысленно поставь маму и папу перед собой и скажи: спасибо за жизнь, дальше я иду сама. Прощать не обязательно. Важно перестать ждать, что они станут другими.",
+                  "exercise": "Допиши фразу: из-за родителей я до сих пор… А теперь перепиши её так: я взрослая и теперь выбираю… Разница между этими фразами — твоя опора."
+            },
+            "body": {
+                  "affirmation": "Тело на моей стороне, я слышу, о чём оно говорит.",
+                  "practice": "Найди самое напряжённое место в теле. Положи туда руку и спроси: о чём ты молчишь за меня. Симптом часто говорит то, что ты себе сказать не разрешаешь.",
+                  "exercise": "Просканируй тело сверху вниз за минуту. Отметь, где зажато. Свяжи это с темой, которая давит в жизни — тело показывает на неё точнее, чем голова."
+            },
+            "trust": {
+                  "affirmation": "Мир меня держит, я могу опереться на жизнь.",
+                  "practice": "Вспомни три случая, когда всё сложилось лучше, чем ты боялась. Внимание цепляется за угрозы и стирает поддержку. Верни её в поле зрения намеренно.",
+                  "exercise": "Сегодня один раз отпусти контроль на десять процентов: сделай что-то без гарантии результата. Заметь — мир устоял. Так по капле возвращается доверие."
+            },
+            "selfworth": {
+                  "affirmation": "Я ценна по факту, что я есть. Это не обсуждается.",
+                  "practice": "Поймай мысль «я недостаточно…» и спроси: чей это голос. Верни фразу тому, от кого она пришла. Ценность не зарабатывают — с ней рождаются.",
+                  "exercise": "Выпиши пять своих качеств, за которые тебя никто не хвалил, но которые ты ценишь в себе сама. Это фундамент, который не зависит от чужой оценки."
+            },
+            "boundaries": {
+                  "affirmation": "Я имею право на «нет» и остаюсь при этом хорошей.",
+                  "practice": "Вспомни, где сегодня ты сказала «да», а внутри было «нет». Это и есть точка, где граница сдаётся. Проговори про себя честный ответ — телу сразу станет легче.",
+                  "exercise": "Составь список из трёх вещей, которые с тобой недопустимы. Это твои границы. Держать их — не про конфликт, а про согласие с собой."
+            }
+      },
+      "demoEntries": [
+            {
+                  "date": "2026-09-13",
+                  "stateId": "trevoga",
+                  "themeId": "money"
+            },
+            {
+                  "date": "2026-09-14",
+                  "stateId": "vina",
+                  "themeId": "boundaries"
+            },
+            {
+                  "date": "2026-09-15",
+                  "stateId": "zlost",
+                  "themeId": "money"
+            },
+            {
+                  "date": "2026-09-16",
+                  "stateId": "spokoystvie",
+                  "themeId": "trust"
+            },
+            {
+                  "date": "2026-09-17",
+                  "stateId": "strah",
+                  "themeId": "money"
+            },
+            {
+                  "date": "2026-09-18",
+                  "stateId": "pustota",
+                  "themeId": "relations"
+            }
+      ],
+      "offers": [
+            {
+                  "id": "team_review",
+                  "title": "Персональный разбор с психологом команды",
+                  "text": "Глубокая проработка твоего запроса со специалистом нашей команды.",
+                  "cta": "Записаться",
+                  "url": "https://t.me/manager_kharu"
+            },
+            {
+                  "id": "live_course",
+                  "title": "Живой трансформационный курс онлайн",
+                  "text": "Пройти изменения в потоке и в группе — вместе, а не в одиночку.",
+                  "cta": "Узнать подробнее",
+                  "url": "https://t.me/manager_kharu"
+            },
+            {
+                  "id": "session_olga",
+                  "title": "Сессия с Хару Ольгой",
+                  "text": "Личная работа один на один — точно и глубоко.",
+                  "cta": "Записаться",
+                  "url": "https://t.me/manager_kharu"
+            }
+      ]
+};
+
+    var DATA = null;
+    var pick = { stateId: null, themeId: null }; // выбор в текущей отметке
+    var todayEntry = null; // сегодняшняя отметка
+    var entries = [];       // все отметки (источник правды)
+    var isDemo = true;      // true = демо-данные (нет сохранения), false = реальные отметки пользователя
+    var STORAGE_KEY = 'baro_entries';
+
+    // ---------- Загрузка данных с антикешем ----------
+    function loadData() {
+      fetch('data.json?v=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('bad status'); return r.json(); })
+        .then(function (json) { DATA = json; initEntries(render); })
+        .catch(function () {
+          DATA = FALLBACK;
+          showNotice('Показан демо-режим: данные загружены из встроенного примера.');
+          initEntries(render);
+        });
+    }
+
+    // ---------- Инициализация отметок ----------
+    // В Telegram (CloudStorage доступен) — реальные сохранённые отметки, начинаем с пустого.
+    // Вне Telegram (превью/браузер) — демо-данные, чтобы экран был живым.
+    function initEntries(cb) {
+      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function' ? tg.CloudStorage : null;
+      if (cs) {
+        try {
+          cs.getItem(STORAGE_KEY, function (err, val) {
+            if (!err) {
+              isDemo = false;
+              try { entries = val ? (JSON.parse(val) || []) : []; } catch (e) { entries = []; }
+            } else {
+              isDemo = true;
+              entries = (DATA.demoEntries || []).slice();
+            }
+            afterInit(cb);
+          });
+          return;
+        } catch (e) {}
+      }
+      isDemo = true;
+      entries = (DATA.demoEntries || []).slice();
+      afterInit(cb);
+    }
+
+    function afterInit(cb) {
+      var t = today();
+      todayEntry = null;
+      for (var i = 0; i < entries.length; i++) if (entries[i].date === t) todayEntry = entries[i];
+      cb();
+    }
+
+    // ---------- Сохранение ----------
+    function persistEntries() {
+      if (isDemo) return; // демо-режим не сохраняем
+      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function' ? tg.CloudStorage : null;
+      if (!cs) return;
+      try { cs.setItem(STORAGE_KEY, JSON.stringify(entries), function () {}); } catch (e) {}
+    }
+
+    function showNotice(msg) {
+      var n = document.getElementById('notice');
+      n.textContent = msg;
+      n.classList.remove('hidden');
+    }
+
+    // ---------- Хелперы ----------
+    function byId(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i]; return null; }
+    function esc(s) { return String(s == null ? '' : s); }
+
+    function weekEntries() {
+      // последние 7 отметок по дате
+      var arr = entries.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+      return arr.slice(-7);
+    }
+
+    // ---------- Рендер главного экрана ----------
+    function render() {
+      document.getElementById('appTitle').textContent = DATA.app.title;
+      document.getElementById('appSub').textContent = DATA.app.subtitle;
+      document.getElementById('greetLine').textContent = (DATA.app.greetingName || 'Привет') + '!';
+      document.getElementById('authorFoot').textContent = DATA.app.author || '';
+
+      var entries = weekEntries();
+      var streak = entries.length;
+      document.getElementById('streakLine').textContent = streak > 0
+        ? 'Отмечаешься ' + streak + ' ' + plural(streak, ['день', 'дня', 'дней']) + ' подряд'
+        : 'Сделай первую отметку сегодня';
+      document.getElementById('weekCount').textContent = streak;
+
+      // точки недели (7)
+      var dots = '';
+      for (var i = 0; i < 7; i++) dots += '<div class="dot' + (i < Math.min(streak, 7) ? ' on' : '') + '"></div>';
+      document.getElementById('weekDots').innerHTML = dots;
+
+      // офферы
+      var oh = '';
+      (DATA.offers || []).forEach(function (o) {
+        oh += '<div class="offer"><h4>' + esc(o.title) + '</h4><p>' + esc(o.text) + '</p>' +
+              '<a href="' + esc(o.url) + '" target="_blank" onclick="return openLink(\'' + esc(o.url) + '\')">' +
+              esc(o.cta || 'Подробнее') + ' →</a></div>';
+      });
+      document.getElementById('offers').innerHTML = oh;
+
+      renderStateGrid();
+      renderThemeGrid();
+    }
+
+    function plural(n, forms) {
+      var n10 = n % 10, n100 = n % 100;
+      if (n10 === 1 && n100 !== 11) return forms[0];
+      if (n10 >= 2 && n10 <= 4 && (n100 < 10 || n100 >= 20)) return forms[1];
+      return forms[2];
+    }
+
+    function renderStateGrid() {
+      var g = document.getElementById('stateGrid');
+      g.innerHTML = '';
+      DATA.states.forEach(function (s) {
+        var el = document.createElement('div');
+        el.className = 'chip' + (pick.stateId === s.id ? ' sel' : '');
+        el.innerHTML = '<span class="em">' + s.emoji + '</span><span>' + esc(s.label) + '</span>';
+        el.onclick = function () { pick.stateId = s.id; renderStateGrid(); setTimeout(function () { go('theme'); }, 160); };
+        g.appendChild(el);
+      });
+    }
+
+    function renderThemeGrid() {
+      var g = document.getElementById('themeGrid');
+      g.innerHTML = '';
+      DATA.themes.forEach(function (t) {
+        var el = document.createElement('div');
+        el.className = 'chip' + (pick.themeId === t.id ? ' sel' : '');
+        el.innerHTML = '<span class="em">' + t.emoji + '</span><span>' + esc(t.label) + '</span>';
+        el.onclick = function () {
+          pick.themeId = t.id; renderThemeGrid();
+          var b = document.getElementById('confirmMark');
+          b.disabled = false; b.style.opacity = '1';
+        };
+        g.appendChild(el);
+      });
+    }
+
+    // ---------- Навигация ----------
+    function go(name) {
+      var views = document.querySelectorAll('.view');
+      for (var i = 0; i < views.length; i++) views[i].classList.remove('active');
+      document.getElementById('view-' + name).classList.add('active');
+      window.scrollTo(0, 0);
+    }
+
+    function startMark() {
+      pick = { stateId: null, themeId: null };
+      var b = document.getElementById('confirmMark');
+      b.disabled = true; b.style.opacity = '.5';
+      renderStateGrid(); renderThemeGrid();
+      go('state');
+    }
+
+    function finishMark() {
+      if (!pick.stateId || !pick.themeId) return;
+      var t = today();
+      todayEntry = { date: t, stateId: pick.stateId, themeId: pick.themeId };
+      // одна отметка в день: заменяем сегодняшнюю, если уже была
+      entries = entries.filter(function (e) { return e.date !== t; });
+      entries.push(todayEntry);
+      persistEntries();
+      var sp = (DATA.statePractices && DATA.statePractices[pick.stateId]) || null;
+      var st = byId(DATA.states, pick.stateId);
+      document.getElementById('resEmo').textContent = st ? st.emoji : '🌿';
+      document.getElementById('resTitle').textContent = sp ? sp.title : 'Практика';
+      document.getElementById('resText').textContent = sp ? sp.text : 'Побудь с собой несколько минут.';
+      go('result');
+      haptic();
+    }
+
+    function today() {
+      var d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    // ---------- Итог дня и недели ----------
+    function openSummary() {
+      var entries = weekEntries();
+
+      // Итог дня
+      var dayEl = document.getElementById('daySummary');
+      if (todayEntry) {
+        var st = byId(DATA.states, todayEntry.stateId);
+        var th = byId(DATA.themes, todayEntry.themeId);
+        dayEl.innerHTML = 'Сегодня ты отметила состояние <b>' + (st ? st.emoji + ' ' + esc(st.label) : '—') +
+          '</b> в теме <b>' + (th ? th.emoji + ' ' + esc(th.label) : '—') + '</b>.';
+      } else {
+        dayEl.innerHTML = 'Сегодня ты ещё не отмечалась. Показываю итог по неделе ниже — а состояние дня появится, как только отметишься.';
+      }
+
+      // Преобладающее состояние
+      var stateCount = {};
+      entries.forEach(function (e) { stateCount[e.stateId] = (stateCount[e.stateId] || 0) + 1; });
+      var domId = null, domN = -1;
+      for (var k in stateCount) if (stateCount[k] > domN) { domN = stateCount[k]; domId = k; }
+      var domSt = domId ? byId(DATA.states, domId) : null;
+      document.getElementById('domEmo').textContent = domSt ? domSt.emoji : '—';
+      document.getElementById('domState').textContent = domSt ? domSt.label : '—';
+      document.getElementById('cntBig').textContent = entries.length;
+
+      // Тема с наибольшим напряжением (сумма tension состояний по теме)
+      var themeTension = {};
+      entries.forEach(function (e) {
+        var s = byId(DATA.states, e.stateId);
+        var w = s ? (s.tension || 1) : 1;
+        themeTension[e.themeId] = (themeTension[e.themeId] || 0) + w;
+      });
+      var hotId = null, hotN = -1;
+      for (var t in themeTension) if (themeTension[t] > hotN) { hotN = themeTension[t]; hotId = t; }
+      var hotTh = hotId ? byId(DATA.themes, hotId) : null;
+      var content = (DATA.themeContent && DATA.themeContent[hotId]) || null;
+
+      document.getElementById('hotTheme').textContent = hotTh ? (hotTh.emoji + ' ' + hotTh.label) : '—';
+      document.getElementById('hotAff').textContent = content ? content.affirmation : '';
+      document.getElementById('hotPractice').textContent = content ? content.practice : '';
+      document.getElementById('hotExercise').textContent = content ? content.exercise : '';
+
+      go('summary');
+    }
+
+    // ---------- Внешние ссылки через Telegram ----------
+    function openLink(url) {
+      if (tg && tg.openTelegramLink && url.indexOf('t.me') !== -1) { tg.openTelegramLink(url); return false; }
+      if (tg && tg.openLink) { tg.openLink(url); return false; }
+      return true;
+    }
+    function haptic() { try { if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success'); } catch (e) {} }
+
+    // ---------- Старт ----------
+    loadData();
+  </script>
+</body>
+</html>

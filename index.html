@@ -156,6 +156,26 @@
     .hot .cap { font-size: 12px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--gold); font-weight: 600; }
     .hot .theme { font-size: 20px; font-weight: 700; margin: 6px 0 2px; }
     .block-h { font-size: 13px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gold); font-weight: 600; margin: 18px 0 6px; }
+    .razbor-lock { text-align: center; padding: 22px 10px 6px; }
+    .razbor-lock .lock-emo { font-size: 34px; margin-bottom: 8px; opacity: .85; }
+    .razbor-lock .lock-title { font-size: 16px; font-weight: 700; color: var(--gold-soft); margin-bottom: 6px; }
+    .razbor-lock .lock-text { font-size: 14px; color: var(--text-dim); }
+    .hint-card { text-align: center; padding: 30px 20px; }
+    .hint-mark { font-size: 34px; margin-bottom: 14px; }
+    .hint-text { font-size: 19px; line-height: 1.5; color: var(--gold-soft); font-style: italic; }
+    .hint-source { margin-top: 14px; font-size: 13px; color: var(--text-dim); letter-spacing: 0.4px; }
+    .disc-head { display: flex; align-items: center; justify-content: space-between; }
+    .disc-count { font-size: 15px; font-weight: 700; color: var(--gold-soft); }
+    .habit { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); cursor: pointer; user-select: none; }
+    .habit:first-child { border-top: none; }
+    .habit .h-em { font-size: 20px; width: 26px; text-align: center; }
+    .habit .h-label { flex: 1; font-size: 14.5px; line-height: 1.35; }
+    .habit .h-box { width: 26px; height: 26px; flex: 0 0 26px; border-radius: 8px; border: 1.5px solid var(--line); display: grid; place-items: center; color: transparent; font-size: 15px; transition: all .12s ease; }
+    .habit.done .h-box { background: linear-gradient(135deg, var(--gold-soft), var(--gold)); border-color: var(--gold); color: #241c0a; }
+    .habit.done .h-label { color: var(--text-dim); }
+    .habit .h-why { display: block; font-size: 12px; color: var(--text-mute); margin-top: 3px; line-height: 1.3; }
+    .disc-streak { font-size: 14px; color: var(--gold-soft); font-weight: 600; }
+    .disc-praise { margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--gold-dim); border: 1px solid rgba(217,180,106,0.4); color: var(--gold-soft); font-size: 14px; text-align: center; }
     .aff { font-size: 16px; font-style: italic; color: var(--gold-soft); }
 
     /* views */
@@ -219,6 +239,21 @@
           <div class="dots" id="weekDots"></div>
         </div>
         <button class="btn btn-ghost" style="margin-top:14px" onclick="openSummary()">Открыть итог дня и недели</button>
+      </div>
+
+      <!-- дисциплина -->
+      <div class="card">
+        <div class="label">Дисциплина</div>
+        <div class="q-title" style="margin-bottom:4px">Опора против тревоги</div>
+        <p class="q-sub" id="discHome" style="margin-bottom:14px">Отметь простые действия дня — ритм успокаивает нервную систему.</p>
+        <button class="btn btn-ghost" onclick="openDiscipline()">Открыть трекер</button>
+      </div>
+
+      <!-- доп. опция: подсказка от пространства -->
+      <div class="card">
+        <div class="label">Подсказка</div>
+        <div class="q-title" style="margin-bottom:12px">Послание от пространства</div>
+        <button class="btn btn-ghost" onclick="showHint()">✨ Вытянуть подсказку</button>
       </div>
 
       <!-- 5. продолжить путь -->
@@ -300,26 +335,71 @@
           </div>
         </div>
 
-        <div class="hot">
-          <div class="cap">Больше всего напряжения</div>
-          <div class="theme" id="hotTheme">💰 Деньги</div>
-          <div style="color:var(--text-dim);font-size:13.5px" id="hotHint">Эта тема забирала у тебя больше всего сил.</div>
+        <div id="razborBlock">
+          <div class="hot">
+            <div class="cap">Больше всего напряжения</div>
+            <div class="theme" id="hotTheme">💰 Деньги</div>
+            <div style="color:var(--text-dim);font-size:13.5px" id="hotHint">Эта тема забирала у тебя больше всего сил.</div>
+          </div>
+
+          <div class="block-h">Аффирмация</div>
+          <div class="aff" id="hotAff"></div>
+
+          <div class="block-h">Что важно увидеть</div>
+          <div class="practice-text" id="hotInsight"></div>
+
+          <div class="block-h">Практика</div>
+          <div class="practice-text" id="hotPractice"></div>
+
+          <div class="block-h">Упражнение</div>
+          <div class="practice-text" id="hotExercise"></div>
         </div>
 
-        <div class="block-h">Аффирмация</div>
-        <div class="aff" id="hotAff"></div>
-
-        <div class="block-h">Что важно увидеть</div>
-        <div class="practice-text" id="hotInsight"></div>
-
-        <div class="block-h">Практика</div>
-        <div class="practice-text" id="hotPractice"></div>
-
-        <div class="block-h">Упражнение</div>
-        <div class="practice-text" id="hotExercise"></div>
+        <div id="razborLock" class="razbor-lock hidden">
+          <div class="lock-emo">🔒</div>
+          <div class="lock-title">Разбор недели откроется позже</div>
+          <div class="lock-text" id="razborLockText"></div>
+        </div>
       </div>
 
       <button class="btn btn-primary" onclick="go('home')">Хорошо, вернуться</button>
+    </div>
+
+    <!-- ============ HINT ============ -->
+    <div id="view-hint" class="view">
+      <div class="top-bar">
+        <button class="back" onclick="go('home')">‹</button>
+        <h2>Подсказка от пространства</h2>
+      </div>
+      <div class="card glow hint-card">
+        <div class="hint-mark">✨</div>
+        <div class="hint-text" id="hintText"></div>
+        <div class="hint-source" id="hintSource"></div>
+      </div>
+      <button class="btn btn-primary" onclick="showHint()">Ещё подсказка</button>
+      <button class="btn btn-soft" onclick="go('home')">На главный экран</button>
+    </div>
+
+    <!-- ============ DISCIPLINE ============ -->
+    <div id="view-discipline" class="view">
+      <div class="top-bar">
+        <button class="back" onclick="go('home')">‹</button>
+        <h2>Дисциплина</h2>
+      </div>
+      <div class="card">
+        <p class="q-sub" id="discIntro" style="margin:0 0 12px"></p>
+        <div class="disc-streak" id="discStreak"></div>
+      </div>
+      <div class="card">
+        <div class="disc-head">
+          <div class="label" style="margin:0">Сегодня</div>
+          <div class="disc-count" id="discCount">0 / 0</div>
+        </div>
+        <div class="dots" id="discWeek" style="margin:12px 0 4px"></div>
+        <div id="habitList" style="margin-top:8px"></div>
+        <div class="disc-praise hidden" id="discPraise"></div>
+      </div>
+      <button class="btn btn-soft" onclick="go('home')">На главный экран</button>
     </div>
   </div>
 
@@ -707,7 +787,474 @@
                   "cta": "Записаться",
                   "url": "https://t.me/manager_kharu"
             }
-      ]
+      ],
+      "hints": [
+            {
+                  "text": "Пространство не спорит с тобой. Оно повторяет урок, пока ты не услышишь.",
+                  "source": ""
+            },
+            {
+                  "text": "Каждый, кто тебя раздражает, держит зеркало. Вопрос не «кто виноват», а «что во мне это трогает».",
+                  "source": ""
+            },
+            {
+                  "text": "Ты просишь знак — а он уже третий раз стучится тем же человеком, той же болезнью, той же суммой.",
+                  "source": ""
+            },
+            {
+                  "text": "Не всё, что рушится, — беда. Иногда пространство убирает то, на что ты не решалась сама.",
+                  "source": ""
+            },
+            {
+                  "text": "Обида — это счёт, который ты выставляешь себе, а оплаты ждёшь от другого.",
+                  "source": ""
+            },
+            {
+                  "text": "Там, где страшно, — правда. Там, где скучно, — ты предаёшь себя.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты не обязана нести то, что тебе не принадлежит. Даже если это несли до тебя сто лет.",
+                  "source": ""
+            },
+            {
+                  "text": "Пока ты держишься за то, кем была, у тебя заняты руки для того, кем можешь стать.",
+                  "source": ""
+            },
+            {
+                  "text": "Самый громкий страх обычно охраняет самую большую твою силу.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты не опаздываешь. Ты приходишь ровно тогда, когда готова не сбежать.",
+                  "source": ""
+            },
+            {
+                  "text": "Тело не врёт. Если оно сжимается рядом с человеком — слушай его, а не свои объяснения.",
+                  "source": ""
+            },
+            {
+                  "text": "То, что ты не выбираешь, всё равно выбирает тебя. Молчание — тоже ответ.",
+                  "source": ""
+            },
+            {
+                  "text": "Пространство даёт не то, чего ты хочешь, а то, из чего ты сможешь вырасти.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты злишься на закрытую дверь и не видишь, что стоишь в коридоре с десятком открытых.",
+                  "source": ""
+            },
+            {
+                  "text": "Всё, что ты отвергаешь в другом, живёт и в тебе. Иначе бы не задевало.",
+                  "source": ""
+            },
+            {
+                  "text": "Иногда «нет» от мира — это защита от того, о чём ты пожалела бы через год.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты не можешь изменить прошлое, но можешь перестать носить его как приговор.",
+                  "source": ""
+            },
+            {
+                  "text": "Контроль — это страх в красивом костюме. Отпусти хотя бы пуговицу.",
+                  "source": ""
+            },
+            {
+                  "text": "Если тебе тяжело — проверь, не тащишь ли ты чужую сумку.",
+                  "source": ""
+            },
+            {
+                  "text": "Твоя жизнь ждёт, пока ты доспоришь с теми, кого уже нет рядом.",
+                  "source": ""
+            },
+            {
+                  "text": "Не проси у мира лёгкости. Проси силы — и дорога станет по плечу.",
+                  "source": ""
+            },
+            {
+                  "text": "Внутри каждого «я должна» спрятано чьё-то чужое «ты обязана». Найди, чьё.",
+                  "source": ""
+            },
+            {
+                  "text": "Отпустить — не значит разлюбить. Значит перестать держать то, что уже уходит.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты боишься перемен, но именно они — единственное, что тебя ещё не предавало.",
+                  "source": ""
+            },
+            {
+                  "text": "Старое не уходит, пока ты не поблагодаришь его за то, чем оно было.",
+                  "source": ""
+            },
+            {
+                  "text": "Иногда, чтобы жизнь началась, должно закончиться то, что ты называла жизнью.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты держишь дверь закрытой рукой и удивляешься, что никто не входит.",
+                  "source": ""
+            },
+            {
+                  "text": "Не бойся конца. Бойся того, что так и не начнёшь.",
+                  "source": ""
+            },
+            {
+                  "text": "Каждое «слишком поздно» — это чаще «слишком страшно».",
+                  "source": ""
+            },
+            {
+                  "text": "Ты хочешь, чтобы тебя поняли, но сама себя ещё не выслушала.",
+                  "source": ""
+            },
+            {
+                  "text": "Пока ты ищешь виноватого, ты отдаёшь ему власть над своей жизнью.",
+                  "source": ""
+            },
+            {
+                  "text": "Самая длинная дорога — от головы к себе настоящей.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты играешь роль сильной так убедительно, что уже забыла, где живая.",
+                  "source": ""
+            },
+            {
+                  "text": "Гордость — это страх, которому надели корону.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты ждёшь, что мир извинится. Он ждёт, что ты пойдёшь дальше.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты злишься на мать, а живёшь её жизнь. Присмотрись.",
+                  "source": ""
+            },
+            {
+                  "text": "Всё, что ты не простила родителям, ты вручаешь своим детям.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты стала сильной, чтобы никого не просить. Иногда это не сила, а одиночество.",
+                  "source": ""
+            },
+            {
+                  "text": "Род не ждёт от тебя жертвы. Он ждёт, чтобы хоть кто-то наконец был счастлив.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты боишься не бедности, а того, кем станешь, если разбогатеешь.",
+                  "source": ""
+            },
+            {
+                  "text": "Деньги идут туда, где их не держат страхом.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты обесцениваешь то, что делаешь, — и удивляешься, что мир согласен.",
+                  "source": ""
+            },
+            {
+                  "text": "Болезнь — иногда единственный отпуск, который ты себе разрешаешь.",
+                  "source": ""
+            },
+            {
+                  "text": "Тело копит то, что ты не выплакала.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты не устала. Ты давно делаешь не своё.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты называешь это добротой, но добро без «нет» — это часто страх.",
+                  "source": ""
+            },
+            {
+                  "text": "Тебя используют ровно настолько, насколько ты боишься остаться одной.",
+                  "source": ""
+            },
+            {
+                  "text": "Твоё «потерплю» однажды предъявит тебе счёт телом.",
+                  "source": ""
+            },
+            {
+                  "text": "Страх показывает не куда нельзя, а куда очень нужно.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты ждёшь смелости, чтобы начать. А смелость приходит только к начавшим.",
+                  "source": ""
+            },
+            {
+                  "text": "То, чего ты избегаешь, управляет тобой.",
+                  "source": ""
+            },
+            {
+                  "text": "Не всё нужно понять. Иногда достаточно перестать сопротивляться.",
+                  "source": ""
+            },
+            {
+                  "text": "Мир не наказывает. Он показывает, где ты сама себя предала.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты просишь дорогу, но не готова выйти из дома.",
+                  "source": ""
+            },
+            {
+                  "text": "Пространство отвечает не на слова, а на состояние, из которого ты живёшь.",
+                  "source": ""
+            },
+            {
+                  "text": "Не тяни то, что должно уйти. И не гони то, что ещё зреет.",
+                  "source": ""
+            },
+            {
+                  "text": "Совпадений нет. Есть подсказки, которые ты называешь совпадениями.",
+                  "source": ""
+            },
+            {
+                  "text": "Когда не знаешь, что делать, — не делай ничего. Тишина тоже двигает.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты доказываешь свою ценность тем, кто получил тебя бесплатно.",
+                  "source": ""
+            },
+            {
+                  "text": "Тебя выбирают так, как ты выбираешь себя. Начни с себя.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты ищешь любовь снаружи с той же силой, с какой отказываешь себе внутри.",
+                  "source": ""
+            },
+            {
+                  "text": "Перестань быть удобной. Начни быть настоящей.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты живёшь в голове, а жизнь идёт в теле. Вернись.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты откладываешь радость до «когда-нибудь». Его не будет. Есть только сейчас.",
+                  "source": ""
+            },
+            {
+                  "text": "Пока ты готовишься жить, жизнь проходит.",
+                  "source": ""
+            },
+            {
+                  "text": "То, что даётся тяжело, часто и есть твоё. Слишком лёгкое — иногда чужой сценарий.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты не сломана. Ты в процессе. Это разные вещи.",
+                  "source": ""
+            },
+            {
+                  "text": "Кризис — это когда старое уже не держит, а новое ещё не построено. Ты не падаешь, ты между.",
+                  "source": ""
+            },
+            {
+                  "text": "Каждый тупик — это разворот, который ты приняла за стену.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты не обязана быть готовой. Ты обязана быть честной.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты путаешь любовь и привычку не быть одной.",
+                  "source": ""
+            },
+            {
+                  "text": "Если рядом с человеком ты гаснешь — это не твой человек, каким бы хорошим он ни был.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты хочешь, чтобы он изменился. А если изменится — ты будешь с ним или с идеей о нём?",
+                  "source": ""
+            },
+            {
+                  "text": "Люди приходят как зеркала, а уходят как учителя.",
+                  "source": ""
+            },
+            {
+                  "text": "Не спасай тех, кто выбрал тонуть. Утонешь вместе.",
+                  "source": ""
+            },
+            {
+                  "text": "Простить — это перестать пить яд, надеясь, что отравится другой.",
+                  "source": ""
+            },
+            {
+                  "text": "Прошлое живо ровно настолько, насколько ты его пересказываешь.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты носишь обиду как доказательство, что была права. А цена — твоя жизнь сейчас.",
+                  "source": ""
+            },
+            {
+                  "text": "Что не прожито — повторится. Что прожито — отпустит.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты притягиваешь не то, что хочешь, а то, чему соответствуешь. Меняйся — и поле сменится.",
+                  "source": ""
+            },
+            {
+                  "text": "Урок повторяется, пока не выучен. Партнёры меняются — урок нет.",
+                  "source": ""
+            },
+            {
+                  "text": "Всё, что ты гонишь, догоняет. Всё, что принимаешь, отпускает.",
+                  "source": ""
+            },
+            {
+                  "text": "Твоя злость — это карта. Она показывает, где нарушили твою правду.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты не обязана всем нравиться. Это чужая работа — любить тебя или нет.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты бежишь от тишины, потому что в тишине слышно то, что ты давно решила не слышать.",
+                  "source": ""
+            },
+            {
+                  "text": "Не жди идеального момента. Он собирается из несовершенных, которые ты не упустила.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты выросла, но всё ещё просишь разрешения у тех, кто давно тебе не судья.",
+                  "source": ""
+            },
+            {
+                  "text": "Иногда самое смелое — остановиться, а не бежать быстрее.",
+                  "source": ""
+            },
+            {
+                  "text": "То, что ты называешь ленью, часто — страх сделать не идеально.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты ждёшь, что кто-то придёт и спасёт. Приди первой — к себе.",
+                  "source": ""
+            },
+            {
+                  "text": "Не сравнивай свою изнанку с чужим фасадом.",
+                  "source": ""
+            },
+            {
+                  "text": "Ты имеешь право передумать. Верность себе важнее верности старому решению.",
+                  "source": ""
+            },
+            {
+                  "text": "Всё, что ты держишь в тайне из стыда, держит тебя сильнее, чем ты его.",
+                  "source": ""
+            },
+            {
+                  "text": "Если вас раздражает некий предмет, виноват в этом не он сам, а ваше суждение о нём.",
+                  "source": "Марк Аврелий"
+            },
+            {
+                  "text": "И продвигает в деле самая помеха делу, и ведёт по пути трудность пути.",
+                  "source": "Марк Аврелий"
+            },
+            {
+                  "text": "Нигде человек не уединяется тише и покойнее, чем у себя в душе.",
+                  "source": "Марк Аврелий"
+            },
+            {
+                  "text": "Всё следует делать, обо всём говорить и помышлять так, как будто каждое мгновение может оказаться последним.",
+                  "source": "Марк Аврелий"
+            },
+            {
+                  "text": "Ты можешь выполнять свои обязанности, но у тебя нет права на плоды труда — и всё же не отказывайся действовать.",
+                  "source": "Бхагавад-гита, 2.47"
+            },
+            {
+                  "text": "Не заботьтесь о завтрашнем дне: завтрашний сам будет заботиться о своём.",
+                  "source": "Евангелие от Матфея, 6:34"
+            },
+            {
+                  "text": "Всему своё время, и время всякой вещи под небом.",
+                  "source": "Книга Екклесиаста, 3:1"
+            }
+      ],
+      "discipline": {
+            "intro": "Тревогой не управляют борьбой — управляют опорой. Дисциплина здесь не про насилие над собой, а про ритм, который успокаивает нервную систему. Отмечай, что сделала сегодня — по одному шагу.",
+            "habits": [
+                  {
+                        "id": "sleep",
+                        "emoji": "🌅",
+                        "label": "Подъём и отбой примерно в одно время",
+                        "why": "Ровный ритм сна возвращает нервной системе чувство безопасности."
+                  },
+                  {
+                        "id": "breath",
+                        "emoji": "🫁",
+                        "label": "5 минут дыхания с длинным выдохом",
+                        "why": "Длинный выдох включает тормоз нервной системы — тревога падает физически."
+                  },
+                  {
+                        "id": "move",
+                        "emoji": "🚶",
+                        "label": "Движение телом — прогулка или растяжка",
+                        "why": "Движение сжигает гормоны стресса, которые тревога держит в теле."
+                  },
+                  {
+                        "id": "water",
+                        "emoji": "💧",
+                        "label": "Пить воду в течение дня",
+                        "why": "Обезвоженное тело усиливает тревогу — вода буквально успокаивает."
+                  },
+                  {
+                        "id": "food",
+                        "emoji": "🍎",
+                        "label": "Поесть вовремя, не пропускать",
+                        "why": "Ровный сахар в крови = ровное настроение. Пропуски еды раскачивают тревогу."
+                  },
+                  {
+                        "id": "nonews",
+                        "emoji": "📵",
+                        "label": "Час без ленты и новостей",
+                        "why": "Лента подбрасывает тревоге топливо. Час тишины снижает фон."
+                  },
+                  {
+                        "id": "check",
+                        "emoji": "📊",
+                        "label": "Отметить состояние в барометре",
+                        "why": "Отметить состояние — это контакт с собой. Тревога слабеет, когда её называют."
+                  },
+                  {
+                        "id": "silence",
+                        "emoji": "🙏",
+                        "label": "5 минут тишины или благодарности",
+                        "why": "Пять минут тишины возвращают тебя из будущего, где живёт тревога, в настоящее."
+                  },
+                  {
+                        "id": "content",
+                        "emoji": "✍️",
+                        "label": "Шаг в своём деле или блоге — пост, сторис, идея",
+                        "why": "Когда ты проявляешься понемногу каждый день, уходит тревога «стою на месте». Важна не гениальность, а регулярность."
+                  },
+                  {
+                        "id": "noblame",
+                        "emoji": "🕊",
+                        "label": "День без жалоб, критики и осуждения — к себе и другим",
+                        "why": "Жалобы и осуждение держат нервную систему в режиме угрозы. Меньше оценок и ярлыков — меньше тревоги."
+                  }
+            ]
+      }
 };
 
     var DATA = null;
@@ -718,6 +1265,11 @@
     var STORAGE_KEY = 'baro_entries';
     var VARIANTS_KEY = 'baro_variants';
     var variantState = {}; // themeId -> индекс последнего показанного варианта
+    var RAZBOR_KEY = 'baro_razbor';
+    var lastRazborDate = null; // дата последнего показанного недельного разбора
+    var WEEK_DAYS = 7;
+    var HABITS_KEY = 'baro_habits';
+    var habitData = {}; // { 'YYYY-MM-DD': { habitId: true } }
 
     // ---------- Загрузка данных с антикешем ----------
     function loadData() {
@@ -761,7 +1313,97 @@
       todayEntry = null;
       for (var i = 0; i < entries.length; i++) if (entries[i].date === t) todayEntry = entries[i];
       loadVariants();
+      loadRazbor();
+      loadHabits();
       cb();
+    }
+
+    // ---------- Дисциплина: трекер привычек ----------
+    function loadHabits() {
+      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function' ? tg.CloudStorage : null;
+      if (!cs) { habitData = {}; return; }
+      try {
+        cs.getItem(HABITS_KEY, function (err, val) {
+          if (!err && val) { try { habitData = JSON.parse(val) || {}; } catch (e) { habitData = {}; } }
+        });
+      } catch (e) {}
+    }
+    function persistHabits() {
+      if (isDemo) return;
+      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function' ? tg.CloudStorage : null;
+      if (!cs) return;
+      try { cs.setItem(HABITS_KEY, JSON.stringify(habitData), function () {}); } catch (e) {}
+    }
+    function habitsFor(dateStr) { return habitData[dateStr] || {}; }
+    function openDiscipline() { renderDiscipline(); go('discipline'); }
+    function renderDiscipline() {
+      var disc = (DATA && DATA.discipline) || { intro: '', habits: [] };
+      document.getElementById('discIntro').textContent = disc.intro || '';
+      var habits = disc.habits || [];
+      var t = today();
+      var doneToday = habitsFor(t);
+      var doneCount = 0;
+
+      var list = document.getElementById('habitList');
+      list.innerHTML = '';
+      habits.forEach(function (h) {
+        var on = !!doneToday[h.id];
+        if (on) doneCount++;
+        var el = document.createElement('div');
+        el.className = 'habit' + (on ? ' done' : '');
+        el.innerHTML = '<span class="h-em">' + (h.emoji || '•') + '</span>' +
+                       '<span class="h-label">' + esc(h.label) +
+                         (h.why ? '<span class="h-why">' + esc(h.why) + '</span>' : '') +
+                       '</span>' +
+                       '<span class="h-box">✓</span>';
+        el.onclick = function () { toggleHabit(h.id); };
+        list.appendChild(el);
+      });
+
+      document.getElementById('discCount').textContent = doneCount + ' / ' + habits.length;
+
+      // недельная полоса: точка «горит», если в тот день отмечена хотя бы одна привычка
+      var dots = '';
+      for (var i = 6; i >= 0; i--) {
+        var d = new Date(); d.setDate(d.getDate() - i);
+        var ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        var any = Object.keys(habitsFor(ds)).length > 0;
+        dots += '<div class="dot' + (any ? ' on' : '') + '"></div>';
+      }
+      document.getElementById('discWeek').innerHTML = dots;
+
+      // серия дисциплины
+      var streak = computeDiscStreak();
+      var se = document.getElementById('discStreak');
+      se.textContent = streak > 0
+        ? ('🔥 Серия дисциплины: ' + streak + ' ' + plural(streak, ['день', 'дня', 'дней']))
+        : 'Начни серию сегодня — отметь хотя бы один шаг.';
+
+      // похвала за полный день
+      var pr = document.getElementById('discPraise');
+      if (habits.length && doneCount === habits.length) {
+        pr.textContent = 'Все шаги сегодня закрыты. Ты дала телу опору — так тревога теряет власть.';
+        pr.classList.remove('hidden');
+      } else {
+        pr.classList.add('hidden');
+      }
+    }
+    function computeDiscStreak() {
+      function ds(dt) { return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); }
+      var d = new Date();
+      if (Object.keys(habitsFor(ds(d))).length === 0) d.setDate(d.getDate() - 1);
+      var streak = 0, guard = 0;
+      while (Object.keys(habitsFor(ds(d))).length > 0 && guard < 2000) { streak++; guard++; d.setDate(d.getDate() - 1); }
+      return streak;
+    }
+    function toggleHabit(id) {
+      var t = today();
+      if (!habitData[t]) habitData[t] = {};
+      if (habitData[t][id]) { delete habitData[t][id]; }
+      else { habitData[t][id] = true; }
+      persistHabits();
+      renderDiscipline();
+      try { if (tg && tg.HapticFeedback) tg.HapticFeedback.selectionChanged(); } catch (e) {}
     }
 
     // ---------- Ротация вариантов тем ----------
@@ -791,6 +1433,39 @@
       variantState[hotId] = idx;
       persistVariants();
       return arr[idx];
+    }
+    // текущий вариант без перелистывания (для повторного открытия в тот же день)
+    function currentThemeContent(hotId) {
+      var arr = (DATA.themeContent && DATA.themeContent[hotId]) || null;
+      if (!arr) return null;
+      if (!Array.isArray(arr)) return arr;
+      if (!arr.length) return null;
+      var idx = (typeof variantState[hotId] === 'number') ? variantState[hotId] : 0;
+      if (idx < 0 || idx >= arr.length) idx = 0;
+      return arr[idx];
+    }
+
+    // ---------- Недельный разбор ----------
+    function loadRazbor() {
+      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function' ? tg.CloudStorage : null;
+      if (!cs) return;
+      try { cs.getItem(RAZBOR_KEY, function (err, val) { if (!err && val) lastRazborDate = val; }); } catch (e) {}
+    }
+    function persistRazbor() {
+      if (isDemo) return;
+      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function' ? tg.CloudStorage : null;
+      if (!cs) return;
+      try { cs.setItem(RAZBOR_KEY, lastRazborDate, function () {}); } catch (e) {}
+    }
+    function firstEntryDate() {
+      if (!entries || !entries.length) return null;
+      var m = null;
+      for (var i = 0; i < entries.length; i++) if (m === null || entries[i].date < m) m = entries[i].date;
+      return m;
+    }
+    function daysDiff(a, b) {
+      function p(s) { var x = s.split('-'); return Date.UTC(+x[0], +x[1] - 1, +x[2]); }
+      return Math.floor((p(a) - p(b)) / 86400000);
     }
 
     // ---------- Сохранение ----------
@@ -957,13 +1632,39 @@
       var hotId = null, hotN = -1;
       for (var t in themeTension) if (themeTension[t] > hotN) { hotN = themeTension[t]; hotId = t; }
       var hotTh = hotId ? byId(DATA.themes, hotId) : null;
-      var content = pickThemeContent(hotId);
 
-      document.getElementById('hotTheme').textContent = hotTh ? (hotTh.emoji + ' ' + hotTh.label) : '—';
-      document.getElementById('hotAff').textContent = content ? content.affirmation : '';
-      document.getElementById('hotInsight').textContent = content ? (content.insight || '') : '';
-      document.getElementById('hotPractice').textContent = content ? content.practice : '';
-      document.getElementById('hotExercise').textContent = content ? content.exercise : '';
+      // Недельный разбор открывается раз в 7 дней
+      var block = document.getElementById('razborBlock');
+      var lock = document.getElementById('razborLock');
+      var first = firstEntryDate();
+      var t0 = today();
+      var ref = lastRazborDate || first;
+      var shownToday = (lastRazborDate === t0);
+      var unlocked = false;
+      if (first) unlocked = shownToday || (daysDiff(t0, ref) >= WEEK_DAYS);
+      if (isDemo) unlocked = true; // в демо-режиме показываем разбор для предпросмотра
+
+      if (unlocked && hotId) {
+        var content = shownToday ? currentThemeContent(hotId) : pickThemeContent(hotId);
+        if (!shownToday && !isDemo) { lastRazborDate = t0; persistRazbor(); }
+        document.getElementById('hotTheme').textContent = hotTh ? (hotTh.emoji + ' ' + hotTh.label) : '—';
+        document.getElementById('hotAff').textContent = content ? content.affirmation : '';
+        document.getElementById('hotInsight').textContent = content ? (content.insight || '') : '';
+        document.getElementById('hotPractice').textContent = content ? content.practice : '';
+        document.getElementById('hotExercise').textContent = content ? content.exercise : '';
+        block.classList.remove('hidden');
+        lock.classList.add('hidden');
+      } else {
+        block.classList.add('hidden');
+        lock.classList.remove('hidden');
+        var lt = document.getElementById('razborLockText');
+        if (!first) {
+          lt.textContent = 'Сделай первую отметку — и через неделю ежедневных отметок откроется твой разбор темы.';
+        } else {
+          var remain = Math.max(1, WEEK_DAYS - daysDiff(t0, ref));
+          lt.textContent = 'Отмечайся каждый день. Разбор темы недели откроется через ' + remain + ' ' + plural(remain, ['день', 'дня', 'дней']) + '.';
+        }
+      }
 
       go('summary');
     }
@@ -975,6 +1676,23 @@
       return true;
     }
     function haptic() { try { if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success'); } catch (e) {} }
+
+    // ---------- Подсказка от пространства ----------
+    var lastHintIdx = -1;
+    function showHint() {
+      var hints = (DATA && DATA.hints) || [];
+      if (!hints.length) return;
+      var i = Math.floor(Math.random() * hints.length);
+      if (hints.length > 1 && i === lastHintIdx) i = (i + 1) % hints.length; // не повторять подряд
+      lastHintIdx = i;
+      var h = hints[i];
+      var text = (typeof h === 'string') ? h : (h.text || '');
+      var src = (typeof h === 'string') ? '' : (h.source || '');
+      document.getElementById('hintText').textContent = text;
+      document.getElementById('hintSource').textContent = src ? '— ' + src : '';
+      go('hint');
+      try { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); } catch (e) {}
+    }
 
     // ---------- Раскрытие блока «Продолжить путь» ----------
     function toggleOffers() {

@@ -182,6 +182,22 @@
     .prayer-text { font-size: 16px; line-height: 1.7; color: var(--text); font-style: italic; text-align: left; }
     .prayer-text p { margin: 0 0 14px; }
     .prayer-text p:last-child { margin-bottom: 0; color: var(--gold-soft); }
+    .prayer-text .prayer-div { text-align: center; color: var(--gold-soft); opacity: 0.55; font-size: 18px; letter-spacing: 4px; margin: 22px 0; font-style: normal; }
+    .word-card { text-align: center; padding: 30px 22px; }
+    .word-mark { font-size: 26px; margin-bottom: 14px; }
+    .word-prompt { font-size: 17px; line-height: 1.5; color: var(--text); margin-bottom: 18px; }
+    .word-input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.05); border: 1px solid rgba(217,180,106,0.35); border-radius: 12px; color: var(--gold-soft); font-size: 20px; font-weight: 700; text-align: center; padding: 14px 12px; margin-bottom: 12px; outline: none; font-family: inherit; }
+    .word-input::placeholder { color: var(--text-dim); font-weight: 400; }
+    .word-note-input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: var(--text); font-size: 15px; line-height: 1.5; padding: 12px; margin-bottom: 16px; outline: none; resize: none; font-family: inherit; }
+    .word-note-input::placeholder { color: var(--text-dim); }
+    .word-saved { margin-top: 12px; color: var(--gold-soft); font-size: 14px; }
+    .ww-empty { color: var(--text-dim); font-size: 14px; line-height: 1.5; padding: 4px 2px; }
+    .ww-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+    .ww-row { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 10px; background: rgba(255,255,255,0.03); }
+    .ww-day { color: var(--text-dim); font-size: 12px; width: 26px; flex: none; letter-spacing: 1px; }
+    .ww-word { color: var(--text); font-size: 15px; }
+    .ww-today { background: var(--gold-dim); border: 1px solid rgba(217,180,106,0.35); }
+    .ww-today .ww-word { color: var(--gold-soft); font-weight: 600; }
     .aff { font-size: 16px; font-style: italic; color: var(--gold-soft); }
 
     /* views */
@@ -227,6 +243,13 @@
             <span id="streakLine">Отмечаешься 6 дней подряд</span>
           </div>
         </div>
+      </div>
+
+      <!-- слово дня -->
+      <div class="card">
+        <div class="label">Слово дня</div>
+        <div class="q-title" id="wordHomeTitle" style="margin-bottom:12px">Твоё слово на сегодня</div>
+        <button class="btn btn-ghost" onclick="openWord()">✍️ Написать слово дня</button>
       </div>
 
       <!-- 2. вопрос дня + главное действие -->
@@ -390,6 +413,12 @@
         </div>
       </div>
 
+      <div class="card">
+        <div class="label">Слова недели</div>
+        <p class="q-sub" style="margin:0 0 10px">С чем ты шла эти семь дней.</p>
+        <div id="weekWords" class="ww-list"></div>
+      </div>
+
       <button class="btn btn-primary" onclick="go('home')">Хорошо, вернуться</button>
     </div>
     <!-- /week -->
@@ -454,8 +483,24 @@
         <div class="prayer-title" id="prayerTitle"></div>
         <div class="prayer-text" id="prayerText"></div>
       </div>
-      <button class="btn btn-ghost hidden" id="prayerSwitch" onclick="switchPrayer()">Другая молитва</button>
       <button class="btn btn-soft" onclick="go('discipline')">Назад</button>
+    </div>
+
+    <!-- ============ WORD OF THE DAY ============ -->
+    <div id="view-word" class="view">
+      <div class="top-bar">
+        <button class="back" onclick="go('home')">‹</button>
+        <h2>Слово дня</h2>
+      </div>
+      <div class="card glow word-card">
+        <div class="word-mark">✍️</div>
+        <div class="word-prompt">Какое слово или мысль ты берёшь с собой сегодня?</div>
+        <input id="wordInput" class="word-input" type="text" maxlength="40" placeholder="твоё слово…" />
+        <textarea id="wordNoteInput" class="word-note-input" maxlength="200" rows="2" placeholder="короткая мысль к нему — по желанию"></textarea>
+        <button class="btn btn-primary" onclick="saveWord()">Сохранить</button>
+        <div id="wordSaved" class="word-saved hidden">Сохранено ✓</div>
+      </div>
+      <button class="btn btn-soft" onclick="go('home')">На главный экран</button>
     </div>
   </div>
 
@@ -1269,9 +1314,9 @@
                   },
                   {
                         "id": "move",
-                        "emoji": "🚶",
-                        "label": "Движение телом — прогулка или растяжка",
-                        "why": "Движение сжигает гормоны стресса, которые тревога держит в теле."
+                        "emoji": "🏃",
+                        "label": "Спорт или движение — тренировка, прогулка, растяжка",
+                        "why": "Спорт и движение сжигают гормоны стресса, которые тревога держит в теле. Телу нужна разрядка, а не только покой."
                   },
                   {
                         "id": "water",
@@ -1337,18 +1382,14 @@
       ],
       "morningPrayers": [
             {
-                  "title": "Священная молитва",
-                  "text": "О Высший Источник Света и Сознания, именуемый разными именами на разных языках, но Единый в своей сущности,\n\nПусть моё сердце откроется твоему присутствию во всём, что меня окружает. Направь моё сознание к гармонии, мои слова — к истине, мои действия — к благу всех существ.\n\nЯ благодарю за уроки, данные мне, за возможность расти через испытания, за свет, который всегда доступен в глубине моего существа.\n\nПусть я буду проводником мира, инструментом любви, свидетелем красоты твоего проявления во всех формах жизни.\n\nДа смогу я проживать свою судьбу с достоинством, мудростью и состраданием, помня о единстве всего сущего и вечном законе любви.\n\nДа будет так, на благо всех существ, во всех мирах и измерениях."
-            },
-            {
-                  "title": "Молитва изобилия",
-                  "text": "Вселенная (Боже, Источник Изобилия — выбери близкое обращение),\n\nЯ открываюсь сегодня потоку щедрости и возможностей. Прошу очистить моё сознание от тревоги о будущем и сожалений о прошлом. Наполни моё сердце глубоким доверием, а ум — кристальной ясностью.\n\nНастрой моё внутреннее состояние на вибрацию процветания, где я легко замечаю открывающиеся двери, различаю верные знаки и принимаю точные решения вовремя. Направь мои шаги к делам, проектам и встречам, которые служат благу, приносят честную прибыль и ощущение полноты.\n\nПомоги мне действовать смело, но без суеты, быть восприимчивой, но не пассивной. Пусть моя энергия и намерения притягивают нужные ресурсы, а каждое моё действие создаёт ценность и открывает новые пути для дохода.\n\nЯ благодарю за всё, что имею сейчас, и с радостным ожиданием принимаю всё, что приходит. Я в потоке. Мои решения своевременны. Мои возможности расширяются. Да будет так. И это уже есть."
+                  "title": "Утренняя молитва",
+                  "text": "О Высший Источник Света и Сознания, именуемый разными именами на разных языках, но Единый в своей сущности,\n\nПусть моё сердце откроется твоему присутствию во всём, что меня окружает. Направь моё сознание к гармонии, мои слова — к истине, мои действия — к благу всех существ.\n\nЯ благодарю за уроки, данные мне, за возможность расти через испытания, за свет, который всегда доступен в глубине моего существа.\n\nПусть я буду проводником мира, инструментом любви, свидетелем красоты твоего проявления во всех формах жизни.\n\nДа смогу я проживать свою судьбу с достоинством, мудростью и состраданием, помня о единстве всего сущего и вечном законе любви.\n\nДа будет так, на благо всех существ, во всех мирах и измерениях.\n\n✦\n\nВселенная (Боже, Источник Изобилия — выбери близкое обращение),\n\nЯ открываюсь сегодня потоку щедрости и возможностей. Прошу очистить моё сознание от тревоги о будущем и сожалений о прошлом. Наполни моё сердце глубоким доверием, а ум — кристальной ясностью.\n\nНастрой моё внутреннее состояние на вибрацию процветания, где я легко замечаю открывающиеся двери, различаю верные знаки и принимаю точные решения вовремя. Направь мои шаги к делам, проектам и встречам, которые служат благу, приносят честную прибыль и ощущение полноты.\n\nПомоги мне действовать смело, но без суеты, быть восприимчивой, но не пассивной. Пусть моя энергия и намерения притягивают нужные ресурсы, а каждое моё действие создаёт ценность и открывает новые пути для дохода.\n\nЯ благодарю за всё, что имею сейчас, и с радостным ожиданием принимаю всё, что приходит. Я в потоке. Мои решения своевременны. Мои возможности расширяются. Да будет так. И это уже есть."
             }
       ],
       "eveningPrayers": [
             {
                   "title": "Молитва на завершение дня",
-                  "text": "Вселенная (Боже, Источник Покоя — выбери близкое обращение),\n\nДень подошёл к концу, и я отпускаю его. Всё, что было сегодня — сделанное и несделанное, сказанное и промолчавшее, — я оставляю в этом дне. Он завершён, и я благодарю его за всё, чему он меня научил.\n\nЯ отпускаю тревогу о том, что не успела, и вину за то, что было неидеально. Я сделала, что могла, из того состояния, в котором была. Этого достаточно.\n\nЯ отпускаю всех, кого носила сегодня в мыслях, все разговоры и споры. Каждому мысленно говорю: спасибо, я отпускаю тебя до утра. Моя ночь принадлежит только мне и покою.\n\nНаполни моё тело глубоким расслаблением, а ум — тишиной. Пусть каждая клетка восстановится за эту ночь, пусть сон вернёт мне силы, ясность и опору.\n\nЯ доверяю жизни то, что не в моих руках. Пока я сплю, мир держит меня. Я в безопасности. Я могу отпустить контроль и просто отдыхать.\n\nСпасибо за этот день. Спасибо за то, что я есть. Я засыпаю в мире с собой. Да будет так."
+                  "text": "Этот день завершается.\nЯ отпускаю всё, что было: дела, слова, встречи, тревоги, усталость.\nЯ отпускаю чужое, лишнее, тяжёлое.\nПусть уходит негатив, который я собрала за день:\nобиды, раздражение, страх, сомнения, чужие взгляды и мысли.\nЯ не несу это в ночь.\n\nЯ прошу очищения — мягкого, глубокого, спокойного.\nПусть свет пройдёт по моему телу, уму и душе\nи смоет всё, что не моё и не от света.\nПусть всё тёмное, разрушительное и чужое\nрастворится и уйдёт.\n\nЯ прошу благоприятного восстановления.\nПусть сон будет глубоким и спокойным.\nПусть тело отдохнёт,\nмысли станут тише, сердце — мягче.\nПусть силы возвращаются легко и естественно.\nПусть утро придёт с обновлением и ясностью.\n\nЯ закрываю этот день с благодарностью.\nЯ принимаю покой, тишину и обновление.\n\nБлагодарю. Да будет так."
             }
       ]
 };
@@ -1366,6 +1407,8 @@
     var WEEK_DAYS = 7;
     var HABITS_KEY = 'baro_habits';
     var habitData = {}; // { 'YYYY-MM-DD': { habitId: true } }
+    var WORDS_KEY = 'baro_words';
+    var wordData = {}; // { 'YYYY-MM-DD': { word, note } } — слова дня, которые пишет пользователь
 
     // ---------- Загрузка данных с антикешем ----------
     function loadData() {
@@ -1411,6 +1454,7 @@
       loadVariants();
       loadRazbor();
       loadHabits();
+      loadWords();
       cb();
     }
 
@@ -1572,6 +1616,33 @@
       try { cs.setItem(STORAGE_KEY, JSON.stringify(entries), function () {}); } catch (e) {}
     }
 
+    // ---------- Слова дня: хранение ----------
+    function loadWords() {
+      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function' ? tg.CloudStorage : null;
+      if (!cs) { wordData = demoWords(); return; } // вне Telegram — демо для предпросмотра
+      try {
+        cs.getItem(WORDS_KEY, function (err, val) {
+          if (!err && val) { try { wordData = JSON.parse(val) || {}; } catch (e) { wordData = {}; } }
+          try { updateWordHome(); } catch (e) {}
+        });
+      } catch (e) {}
+    }
+    function persistWords() {
+      if (isDemo) return;
+      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function' ? tg.CloudStorage : null;
+      if (!cs) return;
+      try { cs.setItem(WORDS_KEY, JSON.stringify(wordData), function () {}); } catch (e) {}
+    }
+    function demoWords() {
+      var samples = ['Опора', 'Довольно', 'Мягче', 'Своё', 'Тише', 'Благодарность'];
+      var m = {}, now = new Date();
+      for (var i = 6; i >= 1; i--) {
+        var dd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+        m[fmtDate(dd)] = { word: samples[(6 - i) % samples.length], note: '' };
+      }
+      return m;
+    }
+
     function showNotice(msg) {
       var n = document.getElementById('notice');
       n.textContent = msg;
@@ -1620,6 +1691,7 @@
       document.getElementById('appSub').textContent = DATA.app.subtitle;
       document.getElementById('greetLine').textContent = (DATA.app.greetingName || 'Привет') + '!';
       document.getElementById('authorFoot').textContent = DATA.app.author || '';
+      updateWordHome();
 
       var wk = weekEntries();
       var days = distinctDates(wk).length;
@@ -1817,6 +1889,24 @@
         }
       }
 
+      // Слова недели — то, что пользователь записал за последние 7 дней
+      var wrap = document.getElementById('weekWords');
+      if (wrap) {
+        var wd = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+        var now = new Date();
+        var out = '', any = false;
+        for (var i = 6; i >= 0; i--) {
+          var dd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+          var rec = wordData[fmtDate(dd)];
+          if (rec && rec.word) {
+            any = true;
+            out += '<div class="ww-row' + (i === 0 ? ' ww-today' : '') + '"><span class="ww-day">' +
+                   wd[dd.getDay()] + '</span><span class="ww-word">' + esc(rec.word) + '</span></div>';
+          }
+        }
+        wrap.innerHTML = any ? out : '<div class="ww-empty">Здесь соберутся слова, которые ты запишешь в «Слове дня» за неделю.</div>';
+      }
+
       go('week');
     }
 
@@ -1845,6 +1935,33 @@
       try { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); } catch (e) {}
     }
 
+    // ---------- Слово / мысль дня (пишет пользователь) ----------
+    function openWord() {
+      var cur = wordData[today()] || null;
+      document.getElementById('wordInput').value = cur ? (cur.word || '') : '';
+      document.getElementById('wordNoteInput').value = cur ? (cur.note || '') : '';
+      document.getElementById('wordSaved').classList.add('hidden');
+      go('word');
+      setTimeout(function () { try { document.getElementById('wordInput').focus(); } catch (e) {} }, 200);
+    }
+    function saveWord() {
+      var w = document.getElementById('wordInput').value.trim();
+      var note = document.getElementById('wordNoteInput').value.trim();
+      if (!w) { try { document.getElementById('wordInput').focus(); } catch (e) {} return; }
+      wordData[today()] = { word: w, note: note };
+      persistWords();
+      haptic();
+      updateWordHome();
+      document.getElementById('wordSaved').classList.remove('hidden');
+      setTimeout(function () { go('home'); }, 650);
+    }
+    function updateWordHome() {
+      var el = document.getElementById('wordHomeTitle');
+      if (!el) return;
+      var cur = wordData[today()];
+      el.textContent = (cur && cur.word) ? ('Сегодня: ' + cur.word) : 'Твоё слово на сегодня';
+    }
+
     // ---------- Молитва (утро / вечер) ----------
     var prayerIdx = 0;
     var prayerSet = 'morning';
@@ -1870,10 +1987,12 @@
       if (!pr.length) return;
       var p = pr[prayerIdx] || pr[0];
       document.getElementById('prayerTitle').textContent = p.title || '';
-      var html = String(p.text || '').split('\n\n').map(function (par) { return '<p>' + esc(par) + '</p>'; }).join('');
+      var html = String(p.text || '').split('\n\n').map(function (par) {
+        var t = par.trim();
+        if (t === '✦' || t === '* * *' || t === '···') return '<p class="prayer-div">✦</p>';
+        return '<p>' + esc(par).replace(/\n/g, '<br>') + '</p>';
+      }).join('');
       document.getElementById('prayerText').innerHTML = html;
-      var sw = document.getElementById('prayerSwitch');
-      if (pr.length > 1) sw.classList.remove('hidden'); else sw.classList.add('hidden');
       window.scrollTo(0, 0);
     }
 

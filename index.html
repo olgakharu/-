@@ -2518,8 +2518,42 @@
     // ---------- Старт ----------
     loadData();
 </script>
-<!-- GoatCounter: счётчик посещений -->
+<!-- GoatCounter: считаем ТОЛЬКО реальные открытия живым человеком внутри Telegram.
+     Превью-боты Телеграма и заходы из обычного браузера в счёт не идут. -->
+<script>
+  // no_onload — не считать автоматически при загрузке страницы (иначе в счёт попадают боты).
+  window.goatcounter = { no_onload: true };
+</script>
 <script data-goatcounter="https://kharu-barometr.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
+<script>
+  (function () {
+    // Живой человек внутри Telegram: есть подписанный пользователь Web App.
+    function isRealTelegramUser() {
+      try {
+        var t = window.Telegram && window.Telegram.WebApp;
+        return !!(t && t.initDataUnsafe && t.initDataUnsafe.user && t.initDataUnsafe.user.id);
+      } catch (e) { return false; }
+    }
+    function countOpen() {
+      if (!isRealTelegramUser()) return;
+      if (!window.goatcounter || typeof window.goatcounter.count !== 'function') return;
+      // Отдельная «чистая» страница — только живые открытия приложения.
+      window.goatcounter.count({ path: '/app', title: 'Барометр — открытие приложения' });
+    }
+    // count.js грузится асинхронно — ждём его готовности (до ~10 сек), затем считаем один раз.
+    if (isRealTelegramUser()) {
+      var tries = 0;
+      var timer = setInterval(function () {
+        tries++;
+        if (window.goatcounter && typeof window.goatcounter.count === 'function') {
+          clearInterval(timer); countOpen();
+        } else if (tries > 40) {
+          clearInterval(timer);
+        }
+      }, 250);
+    }
+  })();
+</script>
 </body>
 </html>

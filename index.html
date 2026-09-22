@@ -2519,6 +2519,9 @@
     loadData();
 </script>
 <!-- GoatCounter: считаем ТОЛЬКО реальные открытия живым человеком внутри Telegram.
+     Две метрики:
+       /app  — каждое реальное открытие приложения (активность, «сколько всего заходов»);
+       /user — каждый человек ровно один раз за всю жизнь («сколько уникальных людей»).
      Превью-боты Телеграма и заходы из обычного браузера в счёт не идут. -->
 <script>
   // no_onload — не считать автоматически при загрузке страницы (иначе в счёт попадают боты).
@@ -2529,30 +2532,42 @@
 <script>
   (function () {
     // Живой человек внутри Telegram: есть подписанный пользователь Web App.
-    function isRealTelegramUser() {
+    function tgApp() {
       try {
         var t = window.Telegram && window.Telegram.WebApp;
-        return !!(t && t.initDataUnsafe && t.initDataUnsafe.user && t.initDataUnsafe.user.id);
-      } catch (e) { return false; }
+        if (t && t.initDataUnsafe && t.initDataUnsafe.user && t.initDataUnsafe.user.id) return t;
+      } catch (e) {}
+      return null;
     }
-    function countOpen() {
-      if (!isRealTelegramUser()) return;
-      if (!window.goatcounter || typeof window.goatcounter.count !== 'function') return;
-      // Отдельная «чистая» страница — только живые открытия приложения.
-      window.goatcounter.count({ path: '/app', title: 'Барометр — открытие приложения' });
-    }
-    // count.js грузится асинхронно — ждём его готовности (до ~10 сек), затем считаем один раз.
-    if (isRealTelegramUser()) {
+    var t = tgApp();
+    if (!t) return; // не Telegram или бот-превью — ничего не считаем
+
+    // count.js грузится асинхронно — ждём готовности (до ~10 сек).
+    function whenReady(cb) {
       var tries = 0;
       var timer = setInterval(function () {
         tries++;
-        if (window.goatcounter && typeof window.goatcounter.count === 'function') {
-          clearInterval(timer); countOpen();
-        } else if (tries > 40) {
-          clearInterval(timer);
-        }
+        if (window.goatcounter && typeof window.goatcounter.count === 'function') { clearInterval(timer); cb(); }
+        else if (tries > 40) { clearInterval(timer); }
       }, 250);
     }
+
+    whenReady(function () {
+      // 1) Каждое реальное открытие приложения.
+      try { window.goatcounter.count({ path: '/app', title: 'Барометр — открытие (все)' }); } catch (e) {}
+
+      // 2) Каждый человек — один раз за всю жизнь. Флаг храним в облаке Telegram,
+      //    поэтому один и тот же человек на любом устройстве считается лишь однажды.
+      var cs = t.CloudStorage && typeof t.CloudStorage.getItem === 'function' ? t.CloudStorage : null;
+      if (!cs) return;
+      try {
+        cs.getItem('baro_counted', function (err, val) {
+          if (err || val) return; // ошибка чтения или человек уже посчитан — выходим
+          try { window.goatcounter.count({ path: '/user', title: 'Барометр — уникальный человек' }); } catch (e) {}
+          try { cs.setItem('baro_counted', '1', function () {}); } catch (e) {}
+        });
+      } catch (e) {}
+    });
   })();
 </script>
 </body>

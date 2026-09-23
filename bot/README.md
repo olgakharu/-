@@ -64,6 +64,11 @@ curl -fsSL https://raw.githubusercontent.com/olgakharu/-/claude/friendly-ride-qs
 Скрипт сам поставит всё нужное, спросит токен и ID, запустит бота и включит автозапуск.
 Повторный запуск той же команды обновляет бота до последней версии из GitHub. Настройки и база при этом сохраняются.
 
+Переключить оплату на ЮKassa (или обратно на звёзды):
+```bash
+curl -fsSL https://raw.githubusercontent.com/olgakharu/-/claude/friendly-ride-qsxvyk/bot/deploy/install.sh | sudo bash -s -- --payments
+```
+
 ### Или вручную (для разработки)
 ```bash
 cd bot

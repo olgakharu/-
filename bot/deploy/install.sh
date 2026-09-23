@@ -4,6 +4,7 @@
 # Установка:   curl -fsSL <ссылка на этот файл> | sudo bash
 # Обновление:  тот же запуск — код обновится, настройки и база сохранятся.
 # Поменять настройки:  sudo bash /opt/tochka-bot/app/bot/deploy/install.sh --reconfigure
+# Оплата через ЮKassa:  sudo bash /opt/tochka-bot/app/bot/deploy/install.sh --payments
 # Тексты (content.json) правь в GitHub, затем запусти обновление — правки на сервере затрутся.
 set -euo pipefail
 
@@ -80,6 +81,25 @@ CONTENT_PATH=content.json
 EOF
   ok "Настройки сохранены в $ENV"
 fi
+if [ "${1:-}" = "--payments" ]; then
+  say "Способ оплаты"
+  echo "1 — ЮKassa (рубли, нужен платёжный токен из @BotFather → Payments)"
+  echo "2 — Telegram Stars (звёзды, автопродление)"
+  MODE=$(ask "Выбери 1 или 2: ")
+  if [ "$MODE" = "1" ]; then
+    echo "Платёжный токен выглядит так: 390540012:LIVE:12345 (или ...:TEST:... для проверки)."
+    read -r -s -p "PROVIDER_TOKEN: " PTOKEN </dev/tty; echo
+    PTOKEN=$(clean "$PTOKEN")
+    [[ "$PTOKEN" =~ ^[0-9]+:(LIVE|TEST):[A-Za-z0-9_-]+$ ]] || fail "Токен не похож на платёжный. Запусти ещё раз."
+    sed -i "s|^PAYMENT_MODE=.*|PAYMENT_MODE=provider|; s|^PROVIDER_TOKEN=.*|PROVIDER_TOKEN=$PTOKEN|" "$ENV"
+    ok "Оплата: ЮKassa$( [[ "$PTOKEN" == *:TEST:* ]] && echo ' (ТЕСТОВЫЙ режим — деньги не списываются)')"
+  elif [ "$MODE" = "2" ]; then
+    sed -i "s|^PAYMENT_MODE=.*|PAYMENT_MODE=stars|" "$ENV"
+    ok "Оплата: Telegram Stars"
+  else
+    fail "Нужно ввести 1 или 2"
+  fi
+fi
 chown -R "$RUN_USER:$RUN_USER" "$ROOT"
 chmod 600 "$ENV"   # токен читает только сам бот
 
@@ -114,6 +134,7 @@ if systemctl is-active -q "$SERVICE"; then
     журнал:      sudo journalctl -u $SERVICE -f
     перезапуск:  sudo systemctl restart $SERVICE
     настройки:   sudo bash $BOT/deploy/install.sh --reconfigure
+    оплата:      sudo bash $BOT/deploy/install.sh --payments
     обновить код и тексты из GitHub:  sudo bash $BOT/deploy/install.sh
 EOF
 else

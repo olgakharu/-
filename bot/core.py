@@ -93,7 +93,10 @@ class Services:
         except TelegramForbiddenError:
             await self.db.set_blocked(user_id)
         except TelegramBadRequest as e:
-            log.warning("Не удалось отправить %s: %s", user_id, e)
+            log.warning("Не удалось отправить %s: %r", user_id, e.message)
+            if markup or buttons:
+                # сломанная кнопка не должна съедать всё сообщение — шлём текст без кнопок
+                return await self.send(user_id, text)
         return False
 
     async def send_block(self, user, block: dict, **extra) -> bool:

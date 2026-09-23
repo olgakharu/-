@@ -18,7 +18,9 @@ RUN_USER="tochkabot"
 say()  { printf '\n\033[1;33m▸ %s\033[0m\n' "$*"; }
 ok()   { printf '\033[1;32m✓ %s\033[0m\n' "$*"; }
 fail() { printf '\033[1;31m✗ %s\033[0m\n' "$*"; exit 1; }
-ask()  { local v; read -r -p "$1" v </dev/tty; printf '%s' "$v"; }
+# веб-консоли хостингов иногда подмешивают в ввод служебные коды терминала (^[[6;1R) — вычищаем
+clean() { printf '%s' "$1" | sed -E $'s/\x1b\\[[0-9;?]*[A-Za-z]//g' | tr -d '\000-\037\177 '; }
+ask()  { local v; read -r -p "$1" v </dev/tty; clean "$v"; }
 
 [ "$(id -u)" -eq 0 ] || fail "Запусти через sudo"
 
@@ -54,10 +56,14 @@ if [ ! -f "$ENV" ] || [ "${1:-}" = "--reconfigure" ]; then
   say "Настройка. Ответь на несколько вопросов (Enter — пропустить необязательное)"
   echo "Токен бота из @BotFather. При вводе символы не видны — это нормально."
   read -r -s -p "BOT_TOKEN: " TOKEN </dev/tty; echo
+  TOKEN=$(clean "$TOKEN")
   [[ "$TOKEN" =~ ^[0-9]+:[A-Za-z0-9_-]{30,}$ ]] || fail "Похоже, токен введён неверно. Запусти скрипт ещё раз."
   ADMIN=$(ask "Твой Telegram ID (цифры, узнать у @userinfobot): ")
   CHANNEL=$(ask "ID канала «Точка сборки» (вида -100..., можно позже): ")
   MINIAPP=$(ask "Ссылка на Барометр (https://..., можно позже): ")
+  [[ "$ADMIN" =~ ^[0-9,]*$ ]] || fail "Telegram ID должен состоять из цифр. Запусти скрипт ещё раз."
+  [[ "$CHANNEL" =~ ^(-100[0-9]+)?$ ]] || { echo "ID канала не похож на -100…, пропускаю"; CHANNEL=""; }
+  MINIAPP=$(printf '%s' "$MINIAPP" | grep -o 'https://.*' || true)
 
   cat >"$ENV" <<EOF
 BOT_TOKEN=$TOKEN

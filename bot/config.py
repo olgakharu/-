@@ -1,6 +1,7 @@
 """Настройки бота из .env и контент из content.json."""
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -15,8 +16,14 @@ STARS_PERIOD_SECONDS = 30 * 24 * 3600
 
 
 def _int_or_none(value: str | None) -> int | None:
-    value = (value or "").strip()
-    return int(value) if value else None
+    m = re.search(r"-?\d{5,}", value or "")
+    return int(m.group()) if m else None
+
+
+def _clean_url(value: str | None) -> str:
+    """Достаёт https-ссылку, отбрасывая мусор (например, служебные символы веб-консоли)."""
+    m = re.search(r"https://[^\s\x00-\x1f\x7f]+", value or "")
+    return m.group() if m else ""
 
 
 @dataclass(frozen=True)
@@ -48,14 +55,12 @@ def load_config() -> Config:
 
     return Config(
         bot_token=token,
-        admin_ids=frozenset(
-            int(x) for x in os.getenv("ADMIN_IDS", "").replace(" ", "").split(",") if x
-        ),
+        admin_ids=frozenset(int(x) for x in re.findall(r"\d{5,}", os.getenv("ADMIN_IDS", ""))),
         payment_mode=mode,
         provider_token=provider_token,
         yookassa_receipt=os.getenv("YOOKASSA_RECEIPT", "1").strip() == "1",
         channel_id=_int_or_none(os.getenv("CHANNEL_ID")),
-        miniapp_url=os.getenv("MINIAPP_URL", "").strip(),
+        miniapp_url=_clean_url(os.getenv("MINIAPP_URL")),
         tz=ZoneInfo(os.getenv("TIMEZONE", "Europe/Moscow").strip()),
         grace_hours=int(os.getenv("GRACE_HOURS", "12")),
         db_path=BASE_DIR / os.getenv("DB_PATH", "bot.db"),

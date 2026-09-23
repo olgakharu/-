@@ -85,11 +85,11 @@ if [ "${1:-}" = "--payments" ]; then
   say "Способ оплаты"
   echo "1 — ЮKassa (рубли, нужен платёжный токен из @BotFather → Payments)"
   echo "2 — Telegram Stars (звёзды, автопродление)"
-  MODE=$(ask "Выбери 1 или 2: ")
+  MODE=$(ask "Выбери 1 или 2: "); MODE=$(printf '%s' "$MODE" | grep -o '[12]$' || true)
   if [ "$MODE" = "1" ]; then
     echo "Платёжный токен выглядит так: 390540012:LIVE:12345 (или ...:TEST:... для проверки)."
     read -r -s -p "PROVIDER_TOKEN: " PTOKEN </dev/tty; echo
-    PTOKEN=$(clean "$PTOKEN")
+    PTOKEN=$(clean "$PTOKEN" | grep -oE '[0-9]+:(LIVE|TEST):[A-Za-z0-9_-]+' | tail -1 || true)
     [[ "$PTOKEN" =~ ^[0-9]+:(LIVE|TEST):[A-Za-z0-9_-]+$ ]] || fail "Токен не похож на платёжный. Запусти ещё раз."
     sed -i "s|^PAYMENT_MODE=.*|PAYMENT_MODE=provider|; s|^PROVIDER_TOKEN=.*|PROVIDER_TOKEN=$PTOKEN|" "$ENV"
     ok "Оплата: ЮKassa$( [[ "$PTOKEN" == *:TEST:* ]] && echo ' (ТЕСТОВЫЙ режим — деньги не списываются)')"

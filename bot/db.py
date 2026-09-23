@@ -32,6 +32,10 @@ CREATE TABLE IF NOT EXISTS payments (
     is_recurring        INTEGER NOT NULL DEFAULT 0,
     created_at          INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS settings (
+    key    TEXT PRIMARY KEY,
+    value  TEXT
+);
 """
 
 
@@ -161,6 +165,17 @@ class DB:
 
     async def mark_daily(self, user_id, today: str):
         await self._exec("UPDATE users SET daily_last = ? WHERE id = ?", (today, user_id))
+
+    # ── настройки, заданные из Telegram ───────────────────
+    async def get_setting(self, key: str) -> str | None:
+        row = await self._one("SELECT value FROM settings WHERE key = ?", (key,))
+        return row["value"] if row else None
+
+    async def set_setting(self, key: str, value: str):
+        await self._exec(
+            "INSERT INTO settings (key, value) VALUES (?, ?)"
+            " ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value),
+        )
 
     # ── админка ───────────────────────────────────────────
     async def audience(self, segment: str):

@@ -21,6 +21,7 @@ COMMANDS = [
     BotCommand(command="terms", description="Условия"),
     BotCommand(command="paysupport", description="Вопросы по оплате"),
 ]
+# /connect не показываем в меню — это служебная команда для администратора
 
 
 async def main():
@@ -32,6 +33,7 @@ async def main():
     await db.connect()
     bot = Bot(cfg.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     svc = Services(bot, db, cfg, content)
+    await svc.load_settings()
 
     dp = Dispatcher(svc=svc)
     admin.message.filter(F.from_user.id.in_(cfg.admin_ids))

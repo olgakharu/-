@@ -30,6 +30,27 @@ class _Keep(dict):
 class Services:
     def __init__(self, bot: Bot, db: DB, cfg: Config, content: dict):
         self.bot, self.db, self.cfg, self.content = bot, db, cfg, content
+        self.channel_id: int | None = cfg.channel_id
+
+    async def load_settings(self):
+        """Чат, подключённый командой /connect, важнее значения из .env."""
+        saved = await self.db.get_setting("channel_id")
+        if saved:
+            self.channel_id = int(saved)
+
+    async def set_channel(self, chat_id: int):
+        await self.db.set_setting("channel_id", str(chat_id))
+        self.channel_id = chat_id
+
+    async def channel_rights(self, chat_id: int) -> tuple[bool, bool]:
+        """(может приглашать, может удалять) — права бота в чате."""
+        me = await self.bot.get_me()
+        m = await self.bot.get_chat_member(chat_id, me.id)
+        if m.status == "creator":
+            return True, True
+        if m.status != "administrator":
+            return False, False
+        return bool(getattr(m, "can_invite_users", False)), bool(getattr(m, "can_restrict_members", False))
 
     # ── оформление ────────────────────────────────────────
     @property
@@ -163,11 +184,11 @@ class Services:
 
     # ── доступ в канал ────────────────────────────────────
     async def send_invite(self, user):
-        if not self.cfg.channel_id:
+        if not self.channel_id:
             return
         try:
             invite = await self.bot.create_chat_invite_link(
-                self.cfg.channel_id, name=f"sub {user['id']}",
+                self.channel_id, name=f"sub {user['id']}",
                 expire_date=now() + DAY, member_limit=1,
             )
         except TelegramBadRequest as e:
@@ -180,15 +201,15 @@ class Services:
         await self.send(user["id"], self.render(self.content["invite"], user), markup=markup)
 
     async def remove_from_channel(self, user_id: int):
-        if not self.cfg.channel_id or user_id in self.cfg.admin_ids:
+        if not self.channel_id or user_id in self.cfg.admin_ids:
             return
         try:
-            member = await self.bot.get_chat_member(self.cfg.channel_id, user_id)
+            member = await self.bot.get_chat_member(self.channel_id, user_id)
             if member.status in ("creator", "administrator", "left", "kicked"):
                 return
             # бан + разбан = исключить, но оставить возможность вернуться после оплаты
-            await self.bot.ban_chat_member(self.cfg.channel_id, user_id)
-            await self.bot.unban_chat_member(self.cfg.channel_id, user_id, only_if_banned=True)
+            await self.bot.ban_chat_member(self.channel_id, user_id)
+            await self.bot.unban_chat_member(self.channel_id, user_id, only_if_banned=True)
         except TelegramBadRequest as e:
             log.warning("Не удалось исключить %s из канала: %s", user_id, e)
 

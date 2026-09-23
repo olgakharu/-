@@ -11,6 +11,7 @@ from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    ChatMemberUpdated,
     Message,
     PreCheckoutQuery,
 )
@@ -314,3 +315,76 @@ async def cmd_refund(message: Message, command: CommandObject, bot: Bot, svc: Se
     await svc.db.deactivate(int(uid))
     await svc.remove_from_channel(int(uid))
     await message.answer("Звёзды возвращены, доступ закрыт.")
+
+
+# ── подключение «Точки сборки» ────────────────────────────
+def rights_text(can_invite: bool, can_ban: bool) -> str:
+    mark = lambda ok: "✅" if ok else "❌"  # noqa: E731
+    text = (f"{mark(can_invite)} приглашать по ссылкам\n"
+            f"{mark(can_ban)} удалять участников")
+    if not (can_invite and can_ban):
+        text += ("\n\n⚠️ Выдай боту недостающие права в настройках администраторов чата, "
+                 "иначе он не сможет пускать или убирать людей.")
+    return text
+
+
+async def connect_chat(svc: Services, chat, reply_to: int):
+    await svc.set_channel(chat.id)
+    try:
+        can_invite, can_ban = await svc.channel_rights(chat.id)
+    except TelegramBadRequest:
+        can_invite = can_ban = False
+    await svc.send(reply_to, f"🔗 Подключено: <b>{chat.title}</b> (<code>{chat.id}</code>)\n\n"
+                             + rights_text(can_invite, can_ban))
+
+
+@router.message(Command("connect"), F.chat.type.in_({"group", "supergroup"}))
+async def cmd_connect_group(message: Message, bot: Bot, svc: Services):
+    if message.from_user.id not in svc.cfg.admin_ids:
+        return
+    await connect_chat(svc, message.chat, message.from_user.id)
+    try:
+        await message.delete()  # убираем служебную команду из чата
+    except TelegramBadRequest:
+        pass
+
+
+@router.channel_post(Command("connect"))
+async def cmd_connect_channel(message: Message, svc: Services):
+    # в канале писать могут только его администраторы — этого достаточно
+    for admin_id in svc.cfg.admin_ids:
+        await connect_chat(svc, message.chat, admin_id)
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
+
+
+@router.my_chat_member()
+async def on_added(event: ChatMemberUpdated, svc: Services):
+    """Бота сделали администратором где-то — подсказываем, как подключить."""
+    if event.chat.type == "private" or event.new_chat_member.status != "administrator":
+        return
+    if event.chat.id == svc.channel_id:
+        return
+    for admin_id in svc.cfg.admin_ids:
+        await svc.send(admin_id,
+                       f"Меня добавили администратором в <b>{event.chat.title}</b>.\n\n"
+                       "Чтобы подписчики попадали именно сюда, напиши в этом чате команду "
+                       "<code>/connect</code>")
+
+
+@admin.message(Command("channel"))
+async def cmd_channel(message: Message, svc: Services):
+    if not svc.channel_id:
+        await message.answer("Чат для подписчиков не подключён. Напиши <code>/connect</code> "
+                             "в «Точке сборки» (бот должен быть там администратором).")
+        return
+    try:
+        chat = await message.bot.get_chat(svc.channel_id)
+        can_invite, can_ban = await svc.channel_rights(svc.channel_id)
+        await message.answer(f"Подключено: <b>{chat.title}</b> (<code>{chat.id}</code>)\n\n"
+                             + rights_text(can_invite, can_ban))
+    except TelegramBadRequest as e:
+        await message.answer(f"Чат <code>{svc.channel_id}</code> недоступен: {e.message}\n"
+                             "Проверь, что бот всё ещё администратор.")

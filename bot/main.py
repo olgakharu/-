@@ -5,7 +5,7 @@ import logging
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.types import BotCommand
+from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats
 
 from config import load_config, load_content
 from core import Services
@@ -43,7 +43,9 @@ async def main():
     await bot.delete_webhook(drop_pending_updates=False)
     me = await bot.get_me()
     logging.info("Бот @%s запущен", me.username)
-    await bot.set_my_commands(COMMANDS)
+    # меню команд — только в личке с ботом, в группе «Точки сборки» оно не нужно
+    await bot.delete_my_commands()
+    await bot.set_my_commands(COMMANDS, scope=BotCommandScopeAllPrivateChats())
     task = asyncio.create_task(scheduler_loop(svc))
     try:
         await dp.start_polling(bot)

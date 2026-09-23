@@ -37,6 +37,10 @@ async def main():
     admin.message.filter(F.from_user.id.in_(cfg.admin_ids))
     dp.include_routers(admin, router)
 
+    # если у бота раньше был webhook, getUpdates не работает — отключаем его
+    await bot.delete_webhook(drop_pending_updates=False)
+    me = await bot.get_me()
+    logging.info("Бот @%s запущен", me.username)
     await bot.set_my_commands(COMMANDS)
     task = asyncio.create_task(scheduler_loop(svc))
     try:

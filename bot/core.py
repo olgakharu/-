@@ -171,9 +171,10 @@ class Services:
             log.error("Не удалось создать ссылку в канал (бот админ?): %s", e)
             return
         markup = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="🔑 Войти в клуб", url=invite.invite_link)
+            InlineKeyboardButton(text=self.render(self.content["invite_button"]),
+                                 url=invite.invite_link)
         ]])
-        await self.send(user["id"], self.content["invite"], markup=markup)
+        await self.send(user["id"], self.render(self.content["invite"], user), markup=markup)
 
     async def remove_from_channel(self, user_id: int):
         if not self.cfg.channel_id or user_id in self.cfg.admin_ids:

@@ -120,10 +120,38 @@ class Services:
                 return await self.send(user_id, text)
         return False
 
-    async def send_block(self, user, block: dict, **extra) -> bool:
+    async def send_block(self, user, block: dict, media_key: str | None = None, **extra) -> bool:
+        if media_key:
+            await self.send_media(user["id"], media_key)
         return await self.send(
             user["id"], self.render(block["text"], user, **extra), block.get("buttons")
         )
+
+    # ── голосовые, кружки, фото к сообщениям ──────────────
+    MEDIA_SENDERS = {
+        "voice": "send_voice", "audio": "send_audio", "video_note": "send_video_note",
+        "video": "send_video", "photo": "send_photo",
+    }
+
+    async def get_media(self, key: str) -> dict | None:
+        raw = await self.db.get_setting(f"media:{key}")
+        return json.loads(raw) if raw else None
+
+    async def set_media(self, key: str, kind: str | None, file_id: str | None = None):
+        value = json.dumps({"kind": kind, "file_id": file_id}) if kind else ""
+        await self.db.set_setting(f"media:{key}", value)
+
+    async def send_media(self, user_id: int, key: str):
+        media = await self.get_media(key)
+        if not media:
+            return
+        method = getattr(self.bot, self.MEDIA_SENDERS[media["kind"]])
+        try:
+            await method(user_id, media["file_id"])
+        except TelegramForbiddenError:
+            await self.db.set_blocked(user_id)
+        except TelegramBadRequest as e:
+            log.warning("Не удалось отправить медиа %s: %s", key, e)
 
     # ── оплата ────────────────────────────────────────────
     async def send_offer(self, user):

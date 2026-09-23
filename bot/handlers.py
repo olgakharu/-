@@ -39,7 +39,7 @@ async def ensure_user(svc: Services, tg_user, source: str | None = None):
 async def cmd_start(message: Message, command: CommandObject, svc: Services):
     source = (command.args or "").strip()[:64] or None
     user, _ = await ensure_user(svc, message.from_user, source)
-    await svc.send_block(user, svc.content["welcome"])
+    await svc.send_block(user, svc.content["welcome"], media_key="welcome")
     if source == "pay":  # ссылка t.me/<bot>?start=pay сразу открывает оплату
         await svc.send_offer(user)
 
@@ -390,3 +390,85 @@ async def cmd_channel(message: Message, svc: Services):
     except TelegramBadRequest as e:
         await message.answer(f"Чат <code>{svc.channel_id}</code> недоступен: {e.message}\n"
                              "Проверь, что бот всё ещё администратор.")
+
+
+# ── медиа к сообщениям: админ присылает голосовое/кружок/фото боту ──
+MEDIA_LABELS = {"voice": "голосовое", "audio": "аудио", "video_note": "кружок",
+                "video": "видео", "photo": "фото"}
+_pending_media: dict[int, tuple[str, str]] = {}
+
+
+def media_targets(svc: Services) -> list[tuple[str, str]]:
+    targets = [("welcome", "👋 Приветствие")]
+    for i, _ in enumerate(svc.content.get("funnel") or [], start=1):
+        targets.append((f"funnel_{i}", f"📩 Письмо {i}"))
+    return targets
+
+
+@admin.message(F.chat.type == "private",
+               F.voice | F.audio | F.video_note | F.video | F.photo)
+async def admin_media(message: Message, svc: Services):
+    if message.voice:
+        kind, file_id = "voice", message.voice.file_id
+    elif message.audio:
+        kind, file_id = "audio", message.audio.file_id
+    elif message.video_note:
+        kind, file_id = "video_note", message.video_note.file_id
+    elif message.video:
+        kind, file_id = "video", message.video.file_id
+    else:
+        kind, file_id = "photo", message.photo[-1].file_id
+    _pending_media[message.from_user.id] = (kind, file_id)
+    rows = [[InlineKeyboardButton(text=label, callback_data=f"setmedia:{key}")]
+            for key, label in media_targets(svc)]
+    rows.append([InlineKeyboardButton(text="Отмена", callback_data="setmedia:cancel")])
+    await message.answer(f"Куда поставить это {MEDIA_LABELS[kind]}? Оно будет приходить "
+                         "перед текстом выбранного сообщения.",
+                         reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+
+@router.callback_query(F.data.startswith("setmedia:"))
+async def cb_setmedia(call: CallbackQuery, svc: Services):
+    if call.from_user.id not in svc.cfg.admin_ids:
+        await call.answer()
+        return
+    key = call.data.split(":", 1)[1]
+    pending = _pending_media.pop(call.from_user.id, None)
+    if key == "cancel" or not pending:
+        await call.answer()
+        await call.message.edit_text("Отменено." if key == "cancel" else
+                                     "Не нашёл файл — пришли его ещё раз.")
+        return
+    await svc.set_media(key, *pending)
+    label = dict(media_targets(svc)).get(key, key)
+    await call.answer("Готово")
+    await call.message.edit_text(f"✅ {MEDIA_LABELS[pending[0]].capitalize()} поставлено: {label}.\n\n"
+                                 "Проверить: /start. Убрать: /media")
+
+
+@admin.message(Command("media"))
+async def cmd_media(message: Message, svc: Services):
+    """Список прикреплённых медиа с кнопками «убрать»."""
+    rows, lines = [], []
+    for key, label in media_targets(svc):
+        media = await svc.get_media(key)
+        if media:
+            lines.append(f"{label}: {MEDIA_LABELS[media['kind']]}")
+            rows.append([InlineKeyboardButton(text=f"Убрать — {label}",
+                                              callback_data=f"delmedia:{key}")])
+    if not lines:
+        await message.answer("Пока ничего не прикреплено. Пришли мне голосовое, кружок или фото — "
+                             "и выбери, к какому сообщению его поставить.")
+        return
+    await message.answer("Прикреплено:\n" + "\n".join(lines),
+                         reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+
+@router.callback_query(F.data.startswith("delmedia:"))
+async def cb_delmedia(call: CallbackQuery, svc: Services):
+    if call.from_user.id not in svc.cfg.admin_ids:
+        await call.answer()
+        return
+    await svc.set_media(call.data.split(":", 1)[1], None)
+    await call.answer("Убрано")
+    await call.message.edit_text("Убрано. Посмотреть, что осталось: /media")

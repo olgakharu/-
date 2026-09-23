@@ -23,7 +23,7 @@ async def run_funnels(svc: Services):
         if user["sub_active"] or step >= len(steps):
             await svc.db.stop_funnel(user["id"])
             continue
-        await svc.send_block(user, steps[step])
+        await svc.send_block(user, steps[step], media_key=f"{user['funnel']}_{step + 1}")
         nxt = step + 1
         if nxt < len(steps):
             await svc.db.set_funnel(

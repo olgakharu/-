@@ -82,6 +82,13 @@ async def cb_about(call: CallbackQuery, svc: Services):
     await svc.send_block(user, svc.content["about"], media_key="about")
 
 
+@router.callback_query(F.data == "program")
+async def cb_program(call: CallbackQuery, svc: Services):
+    await call.answer()
+    user, _ = await ensure_user(svc, call.from_user)
+    await svc.send_block(user, svc.content["program"], media_key="program")
+
+
 def status_view(svc: Services, user):
     c = svc.content
     if not user["sub_active"]:
@@ -406,7 +413,8 @@ _pending_media: dict[int, tuple[str, str]] = {}
 
 
 def media_targets(svc: Services) -> list[tuple[str, str]]:
-    targets = [("welcome", "👋 Приветствие"), ("about", "✨ О клубе")]
+    targets = [("welcome", "👋 Приветствие"), ("about", "✨ О клубе"),
+               ("program", "📚 Программа курса")]
     for i, _ in enumerate(svc.content.get("funnel") or [], start=1):
         targets.append((f"funnel_{i}", f"📩 Письмо {i}"))
     return targets

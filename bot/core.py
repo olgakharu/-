@@ -7,6 +7,7 @@ from datetime import datetime
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import (
+    FSInputFile,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     LabeledPrice,
@@ -126,6 +127,26 @@ class Services:
         return await self.send(
             user["id"], self.render(block["text"], user, **extra), block.get("buttons")
         )
+
+    # ── оферта файлом ─────────────────────────────────────
+    async def send_offer_document(self, chat_id: int):
+        """Отправляет PDF оферты; file_id запоминаем, чтобы не загружать файл каждый раз."""
+        path = self.cfg.content_path.parent / "docs" / "oferta.pdf"
+        if not path.exists():
+            return
+        stamp = str(int(path.stat().st_mtime))
+        cached = await self.db.get_setting("oferta_file")
+        file_id = cached.split("|", 1)[1] if cached and cached.startswith(stamp + "|") else None
+        try:
+            msg = await self.bot.send_document(
+                chat_id, file_id or FSInputFile(path, filename="Оферта_Точка_сборки.pdf"),
+                caption="Договор-оферта «Точка сборки»")
+            if not file_id and msg.document:
+                await self.db.set_setting("oferta_file", f"{stamp}|{msg.document.file_id}")
+        except TelegramForbiddenError:
+            await self.db.set_blocked(chat_id)
+        except TelegramBadRequest as e:
+            log.warning("Не удалось отправить оферту: %s", e)
 
     # ── голосовые, кружки, фото к сообщениям ──────────────
     MEDIA_SENDERS = {

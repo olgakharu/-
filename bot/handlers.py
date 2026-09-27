@@ -57,6 +57,7 @@ async def cmd_terms(message: Message, svc: Services):
     if svc.content.get("policy_url"):
         buttons.append({"text": "🔒 Политика конфиденциальности", "url": svc.content["policy_url"]})
     await svc.send(message.chat.id, svc.render(svc.content["terms"]), buttons)
+    await svc.send_offer_document(message.chat.id)
 
 
 @router.message(Command("paysupport"))

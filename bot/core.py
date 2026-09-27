@@ -96,7 +96,7 @@ class Services:
                 btn = InlineKeyboardButton(
                     text=b["text"], web_app=WebAppInfo(url=self.cfg.miniapp_url)
                 )
-            elif action in ("subscribe", "status", "remind", "about", "program"):
+            elif action in ("subscribe", "status", "remind", "about", "program", "story"):
                 btn = InlineKeyboardButton(text=b["text"], callback_data=action)
             else:
                 log.warning("Неизвестная кнопка в content.json: %s", b)

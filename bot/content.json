@@ -109,7 +109,7 @@
     }
   ],
   "offer": {
-    "text": "<b>{title}</b>\n\n{description}\n\nСтоимость: <b>{price}</b> за 30 дней.\n{renew_note}\n\nОплачивая, ты соглашаешься с условиями: /terms",
+    "text": "<b>{title}</b>\n\n{description}\n\nСтоимость: <b>{price}</b> за 30 дней.\n{renew_note}\n\nОплачивая, ты соглашаешься с условиями (/terms) и <a href=\"https://kharuolga.com/a/agreement/2/\">политикой конфиденциальности</a>.",
     "renew_note_stars": "Продлевается автоматически, отменить можно в любой момент в /status.",
     "renew_note_provider": "Без автосписаний: за 3 дня до конца я напомню о продлении."
   },
@@ -166,5 +166,6 @@
         "action": "subscribe"
       }
     ]
-  }
+  },
+  "policy_url": "https://kharuolga.com/a/agreement/2/"
 }

@@ -51,8 +51,11 @@ async def cmd_help(message: Message, svc: Services):
 
 @router.message(Command("terms"))
 async def cmd_terms(message: Message, svc: Services):
-    url = svc.content.get("terms_url")
-    buttons = [{"text": "📄 Полный текст оферты", "url": url}] if url else None
+    buttons = []
+    if svc.content.get("terms_url"):
+        buttons.append({"text": "📄 Публичная оферта", "url": svc.content["terms_url"]})
+    if svc.content.get("policy_url"):
+        buttons.append({"text": "🔒 Политика конфиденциальности", "url": svc.content["policy_url"]})
     await svc.send(message.chat.id, svc.render(svc.content["terms"]), buttons)
 
 

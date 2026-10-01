@@ -2013,6 +2013,16 @@
     var habitData = {}; // { 'YYYY-MM-DD': { habitId: true } }
     var WORDS_KEY = 'baro_words';
     var wordData = {}; // { 'YYYY-MM-DD': { word, note } } — слова дня, которые пишет пользователь
+    var HDAYS_KEY = 'baro_hdays';
+    var hdays = {}; // { номерДня: 1 } — дни, когда была отмечена хотя бы одна привычка (для серии дисциплины)
+    var FIRST_KEY = 'baro_first';
+    var firstDate = null; // дата самой первой отметки (не теряется при очистке старых отметок)
+
+    // Telegram CloudStorage: одно значение — не больше 4096 символов.
+    // Поэтому храним только свежие дни и следим за размером, иначе сохранение молча перестаёт работать.
+    var KEEP_DAYS = 14;
+    var CS_LIMIT = 4000;
+    var HDAYS_MAX = 900;
 
     // Адрес бота для обезличенной статистики. Пусто = ничего не отправляется.
     // После деплоя бота вписать сюда: 'https://<домен-бота>/event'
@@ -2030,59 +2040,132 @@
         });
     }
 
-    // ---------- Инициализация отметок ----------
-    // В Telegram (CloudStorage доступен) — реальные сохранённые отметки, начинаем с пустого.
+    // ---------- Облачное хранилище Telegram ----------
+    function cloud() {
+      return tg && tg.CloudStorage && typeof tg.CloudStorage.getItems === 'function' ? tg.CloudStorage : null;
+    }
+    function saveKey(key, value) {
+      if (isDemo) return;
+      var cs = cloud();
+      if (!cs) return;
+      try {
+        cs.setItem(key, value, function (err) {
+          if (err) showNotice('Не получилось сохранить данные. Проверь соединение и попробуй ещё раз.');
+        });
+      } catch (e) {}
+    }
+    function parseJSON(val, def) {
+      if (!val) return def;
+      try { var v = JSON.parse(val); return (v && typeof v === 'object') ? v : def; } catch (e) { return def; }
+    }
+
+    // ---------- Даты ----------
+    function dayNum(ds) { var x = ds.split('-'); return Math.floor(Date.UTC(+x[0], +x[1] - 1, +x[2]) / 86400000); }
+    function dateFromNum(n) {
+      var d = new Date(n * 86400000);
+      return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+    }
+    function daysAgo(n) { var d = new Date(); return fmtDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() - n)); }
+    function minDate(list) {
+      var m = null;
+      for (var i = 0; i < list.length; i++) if (list[i].date && (m === null || list[i].date < m)) m = list[i].date;
+      return m;
+    }
+    // оставляет в объекте { 'YYYY-MM-DD': … } только свежие дни и укладывает его в лимит хранилища
+    function trimByDate(obj) {
+      var cut = daysAgo(KEEP_DAYS - 1);
+      var keys = Object.keys(obj).sort();
+      keys.forEach(function (k) { if (k < cut) delete obj[k]; });
+      keys = Object.keys(obj).sort();
+      while (keys.length && JSON.stringify(obj).length > CS_LIMIT) delete obj[keys.shift()];
+      return obj;
+    }
+
+    // ---------- Инициализация ----------
+    // В Telegram (CloudStorage доступен) — реальные сохранённые данные, читаем всё одним запросом до первого рендера.
     // Вне Telegram (превью/браузер) — демо-данные, чтобы экран был живым.
     function initEntries(cb) {
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function' ? tg.CloudStorage : null;
+      var cs = cloud();
       if (cs) {
         try {
-          cs.getItem(STORAGE_KEY, function (err, val) {
-            if (!err) {
-              isDemo = false;
-              try { entries = val ? (JSON.parse(val) || []) : []; } catch (e) { entries = []; }
-            } else {
-              isDemo = true;
-              entries = (DATA.demoEntries || []).slice();
-            }
+          cs.getItems([STORAGE_KEY, VARIANTS_KEY, RAZBOR_KEY, HABITS_KEY, HDAYS_KEY, WORDS_KEY, FIRST_KEY], function (err, vals) {
+            if (err || !vals) startDemo();
+            else applyStored(vals);
             afterInit(cb);
           });
           return;
         } catch (e) {}
       }
-      isDemo = true;
-      entries = (DATA.demoEntries || []).slice();
+      startDemo();
       afterInit(cb);
+    }
+
+    function applyStored(vals) {
+      isDemo = false;
+      entries = parseJSON(vals[STORAGE_KEY], []);
+      if (!Array.isArray(entries)) entries = [];
+      variantState = parseJSON(vals[VARIANTS_KEY], {});
+      lastRazborDate = vals[RAZBOR_KEY] || null;
+      habitData = parseJSON(vals[HABITS_KEY], {});
+      wordData = parseJSON(vals[WORDS_KEY], {});
+
+      hdays = {};
+      String(vals[HDAYS_KEY] || '').split(',').forEach(function (s) { if (s) hdays[parseInt(s, 36)] = 1; });
+      var migrated = false;
+      Object.keys(habitData).forEach(function (ds) {
+        if (Object.keys(habitData[ds] || {}).length && !hdays[dayNum(ds)]) { hdays[dayNum(ds)] = 1; migrated = true; }
+      });
+
+      firstDate = vals[FIRST_KEY] || minDate(entries);
+      if (!vals[FIRST_KEY] && firstDate) saveKey(FIRST_KEY, firstDate);
+
+      trimEntries();
+      trimByDate(wordData);
+      if (migrated) persistHabits();
+    }
+
+    function startDemo() {
+      isDemo = true;
+      entries = demoEntries();
+      wordData = demoWords();
+      habitData = {}; hdays = {}; variantState = {}; lastRazborDate = null;
+      firstDate = minDate(entries);
+    }
+
+    // демо-отметки сдвигаются так, чтобы последняя была вчера — иначе со временем демо-неделя пустеет
+    function demoEntries() {
+      var demo = (DATA.demoEntries || []).filter(function (e) { return e.date; });
+      if (!demo.length) return [];
+      var last = demo[0].date;
+      demo.forEach(function (e) { if (e.date > last) last = e.date; });
+      var shift = dayNum(daysAgo(1)) - dayNum(last);
+      return demo.map(function (e) {
+        return { date: dateFromNum(dayNum(e.date) + shift), stateId: e.stateId, themeId: e.themeId };
+      });
     }
 
     function afterInit(cb) {
       var t = today();
       todayEntry = null;
       for (var i = 0; i < entries.length; i++) if (entries[i].date === t) todayEntry = entries[i];
-      loadVariants();
-      loadRazbor();
-      loadHabits();
-      loadWords();
       cb();
     }
 
     // ---------- Дисциплина: трекер привычек ----------
-    function loadHabits() {
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) { habitData = {}; return; }
-      try {
-        cs.getItem(HABITS_KEY, function (err, val) {
-          if (!err && val) { try { habitData = JSON.parse(val) || {}; } catch (e) { habitData = {}; } }
-        });
-      } catch (e) {}
-    }
     function persistHabits() {
       if (isDemo) return;
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) return;
-      try { cs.setItem(HABITS_KEY, JSON.stringify(habitData), function () {}); } catch (e) {}
+      trimByDate(habitData);
+      Object.keys(habitData).forEach(function (ds) { if (!Object.keys(habitData[ds]).length) delete habitData[ds]; });
+      var nums = Object.keys(hdays).map(Number).sort(function (a, b) { return a - b; });
+      if (nums.length > HDAYS_MAX) {
+        nums.slice(0, nums.length - HDAYS_MAX).forEach(function (n) { delete hdays[n]; });
+        nums = nums.slice(nums.length - HDAYS_MAX);
+      }
+      saveKey(HABITS_KEY, JSON.stringify(habitData));
+      saveKey(HDAYS_KEY, nums.map(function (n) { return n.toString(36); }).join(','));
     }
     function habitsFor(dateStr) { return habitData[dateStr] || {}; }
+    function hasHabits(dateStr) { return !!hdays[dayNum(dateStr)] || Object.keys(habitsFor(dateStr)).length > 0; }
     function openDiscipline() { renderDiscipline(); go('discipline'); }
     function renderDiscipline() {
       var disc = (DATA && DATA.discipline) || { intro: '', habits: [] };
@@ -2099,7 +2182,7 @@
         if (on) doneCount++;
         var el = document.createElement('div');
         el.className = 'habit' + (on ? ' done' : '');
-        el.innerHTML = '<span class="h-em">' + (h.emoji || '•') + '</span>' +
+        el.innerHTML = '<span class="h-em">' + esc(h.emoji || '•') + '</span>' +
                        '<span class="h-label">' + esc(h.label) +
                          (h.why ? '<span class="h-why">' + esc(h.why) + '</span>' : '') +
                        '</span>' +
@@ -2115,8 +2198,8 @@
       for (var i = 6; i >= 0; i--) {
         var d = new Date(); d.setDate(d.getDate() - i);
         var ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-        var any = Object.keys(habitsFor(ds)).length > 0;
-        dots += '<div class="dot' + (any ? ' on' : '') + '"></div>';
+        var any = hasHabits(ds);
+        dots +='<div class="dot' + (any ? ' on' : '') + '"></div>';
       }
       document.getElementById('discWeek').innerHTML = dots;
 
@@ -2139,9 +2222,9 @@
     function computeDiscStreak() {
       function ds(dt) { return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); }
       var d = new Date();
-      if (Object.keys(habitsFor(ds(d))).length === 0) d.setDate(d.getDate() - 1);
+      if (!hasHabits(ds(d))) d.setDate(d.getDate() - 1);
       var streak = 0, guard = 0;
-      while (Object.keys(habitsFor(ds(d))).length > 0 && guard < 2000) { streak++; guard++; d.setDate(d.getDate() - 1); }
+      while (hasHabits(ds(d)) && guard < 2000) { streak++; guard++; d.setDate(d.getDate() - 1); }
       return streak;
     }
     function toggleHabit(id) {
@@ -2149,26 +2232,16 @@
       if (!habitData[t]) habitData[t] = {};
       if (habitData[t][id]) { delete habitData[t][id]; }
       else { habitData[t][id] = true; }
+      if (Object.keys(habitData[t]).length) hdays[dayNum(t)] = 1;
+      else delete hdays[dayNum(t)];
       persistHabits();
       renderDiscipline();
       try { if (tg && tg.HapticFeedback) tg.HapticFeedback.selectionChanged(); } catch (e) {}
     }
 
     // ---------- Ротация вариантов тем ----------
-    function loadVariants() {
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) return;
-      try {
-        cs.getItem(VARIANTS_KEY, function (err, val) {
-          if (!err && val) { try { variantState = JSON.parse(val) || {}; } catch (e) {} }
-        });
-      } catch (e) {}
-    }
     function persistVariants() {
-      if (isDemo) return;
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) return;
-      try { cs.setItem(VARIANTS_KEY, JSON.stringify(variantState), function () {}); } catch (e) {}
+      saveKey(VARIANTS_KEY, JSON.stringify(variantState));
     }
     // выбирает следующий по кругу вариант для темы (поддерживает и старый формат-объект)
     function pickThemeContent(hotId) {
@@ -2194,22 +2267,11 @@
     }
 
     // ---------- Недельный разбор ----------
-    function loadRazbor() {
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) return;
-      try { cs.getItem(RAZBOR_KEY, function (err, val) { if (!err && val) lastRazborDate = val; }); } catch (e) {}
-    }
     function persistRazbor() {
-      if (isDemo) return;
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) return;
-      try { cs.setItem(RAZBOR_KEY, lastRazborDate, function () {}); } catch (e) {}
+      saveKey(RAZBOR_KEY, lastRazborDate);
     }
     function firstEntryDate() {
-      if (!entries || !entries.length) return null;
-      var m = null;
-      for (var i = 0; i < entries.length; i++) if (m === null || entries[i].date < m) m = entries[i].date;
-      return m;
+      return firstDate || minDate(entries || []);
     }
     function daysDiff(a, b) {
       function p(s) { var x = s.split('-'); return Date.UTC(+x[0], +x[1] - 1, +x[2]); }
@@ -2232,29 +2294,23 @@
       } catch (e) {}
     }
 
+    // отметки нужны только для итогов дня и недели — храним последние KEEP_DAYS дней в пределах лимита
+    function trimEntries() {
+      var cut = daysAgo(KEEP_DAYS - 1);
+      entries = entries.filter(function (e) { return e && e.date >= cut; });
+      while (entries.length && JSON.stringify(entries).length > CS_LIMIT) entries.shift();
+    }
     function persistEntries() {
       if (isDemo) return; // демо-режим не сохраняем
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) return;
-      try { cs.setItem(STORAGE_KEY, JSON.stringify(entries), function () {}); } catch (e) {}
+      trimEntries();
+      saveKey(STORAGE_KEY, JSON.stringify(entries));
     }
 
     // ---------- Слова дня: хранение ----------
-    function loadWords() {
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) { wordData = demoWords(); return; } // вне Telegram — демо для предпросмотра
-      try {
-        cs.getItem(WORDS_KEY, function (err, val) {
-          if (!err && val) { try { wordData = JSON.parse(val) || {}; } catch (e) { wordData = {}; } }
-          try { updateWordHome(); } catch (e) {}
-        });
-      } catch (e) {}
-    }
     function persistWords() {
       if (isDemo) return;
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) return;
-      try { cs.setItem(WORDS_KEY, JSON.stringify(wordData), function () {}); } catch (e) {}
+      trimByDate(wordData);
+      saveKey(WORDS_KEY, JSON.stringify(wordData));
     }
     function demoWords() {
       var samples = ['Опора', 'Довольно', 'Мягче', 'Своё', 'Тише', 'Благодарность'];
@@ -2274,7 +2330,11 @@
 
     // ---------- Хелперы ----------
     function byId(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i]; return null; }
-    function esc(s) { return String(s == null ? '' : s); }
+    function esc(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
 
     function fmtDate(dt) {
       return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
@@ -2338,7 +2398,7 @@
       var oh = '';
       (DATA.offers || []).forEach(function (o) {
         oh += '<div class="offer"><h4>' + esc(o.title) + '</h4><p>' + esc(o.text) + '</p>' +
-              '<a href="' + esc(o.url) + '" target="_blank" onclick="return openLink(\'' + esc(o.url) + '\')">' +
+              '<a href="' + esc(o.url) + '" target="_blank" onclick="return openLink(this.href)">' +
               esc(o.cta || 'Подробнее') + ' →</a></div>';
       });
       document.getElementById('offers').innerHTML = oh;
@@ -2360,7 +2420,7 @@
       DATA.states.forEach(function (s) {
         var el = document.createElement('div');
         el.className = 'chip' + (pick.stateId === s.id ? ' sel' : '');
-        el.innerHTML = '<span class="em">' + s.emoji + '</span><span>' + esc(s.label) + '</span>';
+        el.innerHTML = '<span class="em">' + esc(s.emoji) + '</span><span>' + esc(s.label) + '</span>';
         el.onclick = function () { pick.stateId = s.id; renderStateGrid(); setTimeout(function () { go('theme'); }, 160); };
         g.appendChild(el);
       });
@@ -2372,7 +2432,7 @@
       DATA.themes.forEach(function (t) {
         var el = document.createElement('div');
         el.className = 'chip' + (pick.themeId === t.id ? ' sel' : '');
-        el.innerHTML = '<span class="em">' + t.emoji + '</span><span>' + esc(t.label) + '</span>';
+        el.innerHTML = '<span class="em">' + esc(t.emoji) + '</span><span>' + esc(t.label) + '</span>';
         el.onclick = function () {
           pick.themeId = t.id; renderThemeGrid();
           var b = document.getElementById('confirmMark');
@@ -2401,9 +2461,10 @@
     function finishMark() {
       if (!pick.stateId || !pick.themeId) return;
       var t = today();
-      todayEntry = { date: t, stateId: pick.stateId, themeId: pick.themeId, ts: Date.now() };
+      todayEntry = { date: t, stateId: pick.stateId, themeId: pick.themeId };
       // несколько отметок в день разрешены — просто добавляем
       entries.push(todayEntry);
+      if (!firstDate) { firstDate = t; saveKey(FIRST_KEY, firstDate); }
       persistEntries();
       sendEvent(pick.stateId, pick.themeId);
       var sp = (DATA.statePractices && DATA.statePractices[pick.stateId]) || null;
@@ -2524,6 +2585,8 @@
         var lt = document.getElementById('razborLockText');
         if (!first) {
           lt.textContent = 'Сделай первую отметку — и через неделю ежедневных отметок откроется твой разбор темы.';
+        } else if (unlocked && !hotId) {
+          lt.textContent = 'Разбор уже готов открыться, но на этой неделе ещё нет отметок. Отметь состояние — и здесь появится разбор самой напряжённой темы.';
         } else {
           var remain = Math.max(1, WEEK_DAYS - daysDiff(t0, ref));
           lt.textContent = 'Отмечайся каждый день. Разбор темы недели откроется через ' + remain + ' ' + plural(remain, ['день', 'дня', 'дней']) + '.';
@@ -2539,7 +2602,7 @@
           document.getElementById('themeOfferBody').innerHTML =
             '<div class="q-title" style="margin-bottom:6px">' + esc(off.title) + '</div>' +
             '<p class="q-sub" style="margin-bottom:14px">' + esc(off.text) + '</p>' +
-            '<a class="btn btn-primary" href="' + esc(off.url) + '" target="_blank" onclick="return openLink(\'' + esc(off.url) + '\')">' +
+            '<a class="btn btn-primary" href="' + esc(off.url) + '" target="_blank" onclick="return openLink(this.href)">' +
             esc(off.cta || 'Подробнее') + '</a>';
           offCard.classList.remove('hidden');
         } else {

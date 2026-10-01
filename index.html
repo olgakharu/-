@@ -2030,57 +2030,198 @@
         });
     }
 
+    // ---------- Хранилище ----------
+    // Облако Telegram (CloudStorage) принимает не больше 4096 символов на один ключ,
+    // а история отметок, привычек и слов растёт каждый день. Поэтому большие данные
+    // режем на куски по разным ключам. Если Telegram старый и облака в нём нет —
+    // храним в памяти телефона (localStorage). Вне Telegram ничего не сохраняем (демо).
+    var CHUNK_BYTES = 4000;
+    var store = null;   // API как у CloudStorage: getItem / getItems / setItem
+    var bigGen = {};    // key -> активное поколение кусков ('a' / 'b')
+    var bigLoaded = {}; // key -> данные прочитаны без ошибок (только тогда разрешена запись)
+    var bigBusy = {}, bigNext = {}, bigParts = {};
+
+    function makeStore() {
+      if (!tg || !tg.initData) return null; // не Telegram (браузер, превью)
+      var cs = tg.CloudStorage;
+      var cloudOk = cs && typeof cs.getItem === 'function' &&
+        (typeof tg.isVersionAtLeast !== 'function' || tg.isVersionAtLeast('6.9'));
+      if (cloudOk) return {
+        getItem: function (k, cb) { try { cs.getItem(k, cb); } catch (e) { cb(e); } },
+        getItems: function (ks, cb) { try { cs.getItems(ks, cb); } catch (e) { cb(e); } },
+        setItem: function (k, v, cb) { try { cs.setItem(k, v, cb); } catch (e) { cb(e); } }
+      };
+      try { localStorage.setItem('baro_probe', '1'); localStorage.removeItem('baro_probe'); } catch (e) { return null; }
+      return {
+        getItem: function (k, cb) {
+          var v; try { v = localStorage.getItem(k); } catch (e) { return cb(e); }
+          cb(null, v == null ? '' : v);
+        },
+        getItems: function (ks, cb) {
+          var o = {};
+          try { ks.forEach(function (k) { var v = localStorage.getItem(k); o[k] = v == null ? '' : v; }); } catch (e) { return cb(e); }
+          cb(null, o);
+        },
+        setItem: function (k, v, cb) {
+          try { localStorage.setItem(k, v); } catch (e) { return cb(e); }
+          cb(null, true);
+        }
+      };
+    }
+
+    // Режет строку на куски не длиннее CHUNK_BYTES байт в UTF-8 (с запасом под любой подсчёт лимита).
+    function splitChunks(str) {
+      var parts = [], start = 0, bytes = 0;
+      for (var i = 0; i < str.length; i++) {
+        var c = str.charCodeAt(i), w, step = 1;
+        if (c < 0x80) w = 1;
+        else if (c < 0x800) w = 2;
+        else if (c >= 0xD800 && c <= 0xDBFF && i + 1 < str.length) { w = 4; step = 2; }
+        else w = 3;
+        if (bytes + w > CHUNK_BYTES) { parts.push(str.slice(start, i)); start = i; bytes = 0; }
+        bytes += w;
+        i += step - 1;
+      }
+      if (start < str.length) parts.push(str.slice(start));
+      return parts;
+    }
+
+    // Заголовок в ключе key: 'v2|<поколение>|<кусков>|<длина>', куски — в key_a0, key_a1…
+    // Новая версия пишется в другое поколение, и только потом переключается заголовок,
+    // поэтому сбой связи посреди записи не портит уже сохранённые данные.
+    function loadBig(key, cb) {
+      store.getItem(key, function (err, head) {
+        if (err) return cb(err);
+        if (!head || head.indexOf('v2|') !== 0) { bigLoaded[key] = true; return cb(null, head || ''); } // пусто или старый формат
+        var p = head.split('|'), gen = p[1], n = +p[2], len = +p[3];
+        if (!n) { bigGen[key] = gen; bigLoaded[key] = true; return cb(null, ''); }
+        var keys = [];
+        for (var i = 0; i < n; i++) keys.push(key + '_' + gen + i);
+        store.getItems(keys, function (err2, vals) {
+          if (err2 || !vals) return cb(err2 || new Error('no data'));
+          var parts = keys.map(function (k) { return vals[k] || ''; });
+          var s = parts.join('');
+          if (s.length !== len) return cb(new Error('broken'));
+          bigGen[key] = gen;
+          bigParts[key + '_' + gen] = parts;
+          bigLoaded[key] = true;
+          cb(null, s);
+        });
+      });
+    }
+
+    function saveBig(key, str) {
+      if (!store || !bigLoaded[key]) return; // не перезаписываем то, что не смогли прочитать
+      if (bigBusy[key]) { bigNext[key] = str; return; }
+      bigBusy[key] = true;
+      var gen = bigGen[key] === 'a' ? 'b' : 'a';
+      var parts = splitChunks(str);
+      var known = bigParts[key + '_' + gen] || [];
+      var written = known.slice();
+      var left = 0, failed = false;
+      function done() {
+        bigBusy[key] = false;
+        if (bigNext[key] != null) { var nx = bigNext[key]; bigNext[key] = null; saveBig(key, nx); }
+      }
+      function writeHead() {
+        store.setItem(key, 'v2|' + gen + '|' + parts.length + '|' + str.length, function (err) {
+          if (!err) bigGen[key] = gen;
+          done();
+        });
+      }
+      parts.forEach(function (part, i) {
+        if (known[i] === part) return; // этот кусок уже лежит в облаке — не пишем повторно
+        left++;
+        store.setItem(key + '_' + gen + i, part, function (err) {
+          if (err) failed = true; else written[i] = part;
+          bigParts[key + '_' + gen] = written;
+          if (--left === 0) { if (failed) done(); else writeHead(); }
+        });
+      });
+      if (!left) writeHead();
+    }
+
+    function parseJSON(s, fallback) {
+      if (!s) return fallback;
+      try { var v = JSON.parse(s); return v == null ? fallback : v; } catch (e) { return undefined; }
+    }
+
+    // Демо-отметки сдвигаем к сегодняшнему дню, чтобы превью всегда выглядело живым.
+    function demoEntries() {
+      var src = (DATA.demoEntries || []);
+      if (!src.length) return [];
+      var last = src.reduce(function (m, e) { return e.date > m ? e.date : m; }, src[0].date);
+      var y = new Date(); y.setDate(y.getDate() - 1);
+      var shift = daysDiff(fmtDate(y), last);
+      return src.map(function (e) {
+        var x = e.date.split('-');
+        var d = new Date(+x[0], +x[1] - 1, +x[2] + shift);
+        return { date: fmtDate(d), stateId: e.stateId, themeId: e.themeId };
+      });
+    }
+
     // ---------- Инициализация отметок ----------
-    // В Telegram (CloudStorage доступен) — реальные сохранённые отметки, начинаем с пустого.
+    // В Telegram — реальные сохранённые отметки (облако или память телефона), начинаем с пустого.
     // Вне Telegram (превью/браузер) — демо-данные, чтобы экран был живым.
     function initEntries(cb) {
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function' ? tg.CloudStorage : null;
-      if (cs) {
-        try {
-          cs.getItem(STORAGE_KEY, function (err, val) {
-            if (!err) {
-              isDemo = false;
-              try { entries = val ? (JSON.parse(val) || []) : []; } catch (e) { entries = []; }
-            } else {
-              isDemo = true;
-              entries = (DATA.demoEntries || []).slice();
-            }
-            afterInit(cb);
-          });
-          return;
-        } catch (e) {}
+      store = makeStore();
+      if (!store) {
+        isDemo = true;
+        entries = demoEntries();
+        habitData = {};
+        wordData = demoWords();
+        return afterInit(cb);
       }
-      isDemo = true;
-      entries = (DATA.demoEntries || []).slice();
-      afterInit(cb);
+      var pending = 5;
+      var failed = false;
+      function step() { if (--pending === 0) finish(); }
+      function finish() {
+        if (failed) {
+          isDemo = true;
+          entries = demoEntries();
+          showNotice('Не получилось загрузить твои отметки. Проверь интернет и открой приложение заново — пока показан пример.');
+        } else {
+          isDemo = false;
+        }
+        afterInit(cb);
+      }
+      loadBig(STORAGE_KEY, function (err, val) {
+        var v = err ? undefined : parseJSON(val, []);
+        if (Array.isArray(v)) entries = v; else { failed = true; bigLoaded[STORAGE_KEY] = false; }
+        step();
+      });
+      loadBig(HABITS_KEY, function (err, val) {
+        var v = err ? undefined : parseJSON(val, {});
+        if (v && typeof v === 'object') habitData = v; else bigLoaded[HABITS_KEY] = false;
+        step();
+      });
+      loadBig(WORDS_KEY, function (err, val) {
+        var v = err ? undefined : parseJSON(val, {});
+        if (v && typeof v === 'object') wordData = v; else bigLoaded[WORDS_KEY] = false;
+        step();
+      });
+      store.getItem(VARIANTS_KEY, function (err, val) {
+        var v = err ? undefined : parseJSON(val, {});
+        if (v && typeof v === 'object') variantState = v;
+        step();
+      });
+      store.getItem(RAZBOR_KEY, function (err, val) {
+        if (!err && val) lastRazborDate = val;
+        step();
+      });
     }
 
     function afterInit(cb) {
       var t = today();
       todayEntry = null;
       for (var i = 0; i < entries.length; i++) if (entries[i].date === t) todayEntry = entries[i];
-      loadVariants();
-      loadRazbor();
-      loadHabits();
-      loadWords();
       cb();
     }
 
     // ---------- Дисциплина: трекер привычек ----------
-    function loadHabits() {
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) { habitData = {}; return; }
-      try {
-        cs.getItem(HABITS_KEY, function (err, val) {
-          if (!err && val) { try { habitData = JSON.parse(val) || {}; } catch (e) { habitData = {}; } }
-        });
-      } catch (e) {}
-    }
     function persistHabits() {
       if (isDemo) return;
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) return;
-      try { cs.setItem(HABITS_KEY, JSON.stringify(habitData), function () {}); } catch (e) {}
+      saveBig(HABITS_KEY, JSON.stringify(habitData));
     }
     function habitsFor(dateStr) { return habitData[dateStr] || {}; }
     function openDiscipline() { renderDiscipline(); go('discipline'); }
@@ -2155,20 +2296,9 @@
     }
 
     // ---------- Ротация вариантов тем ----------
-    function loadVariants() {
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) return;
-      try {
-        cs.getItem(VARIANTS_KEY, function (err, val) {
-          if (!err && val) { try { variantState = JSON.parse(val) || {}; } catch (e) {} }
-        });
-      } catch (e) {}
-    }
     function persistVariants() {
-      if (isDemo) return;
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) return;
-      try { cs.setItem(VARIANTS_KEY, JSON.stringify(variantState), function () {}); } catch (e) {}
+      if (isDemo || !store) return;
+      store.setItem(VARIANTS_KEY, JSON.stringify(variantState), function () {});
     }
     // выбирает следующий по кругу вариант для темы (поддерживает и старый формат-объект)
     function pickThemeContent(hotId) {
@@ -2194,16 +2324,9 @@
     }
 
     // ---------- Недельный разбор ----------
-    function loadRazbor() {
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) return;
-      try { cs.getItem(RAZBOR_KEY, function (err, val) { if (!err && val) lastRazborDate = val; }); } catch (e) {}
-    }
     function persistRazbor() {
-      if (isDemo) return;
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) return;
-      try { cs.setItem(RAZBOR_KEY, lastRazborDate, function () {}); } catch (e) {}
+      if (isDemo || !store) return;
+      store.setItem(RAZBOR_KEY, lastRazborDate, function () {});
     }
     function firstEntryDate() {
       if (!entries || !entries.length) return null;
@@ -2234,27 +2357,13 @@
 
     function persistEntries() {
       if (isDemo) return; // демо-режим не сохраняем
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) return;
-      try { cs.setItem(STORAGE_KEY, JSON.stringify(entries), function () {}); } catch (e) {}
+      saveBig(STORAGE_KEY, JSON.stringify(entries));
     }
 
     // ---------- Слова дня: хранение ----------
-    function loadWords() {
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) { wordData = demoWords(); return; } // вне Telegram — демо для предпросмотра
-      try {
-        cs.getItem(WORDS_KEY, function (err, val) {
-          if (!err && val) { try { wordData = JSON.parse(val) || {}; } catch (e) { wordData = {}; } }
-          try { updateWordHome(); } catch (e) {}
-        });
-      } catch (e) {}
-    }
     function persistWords() {
       if (isDemo) return;
-      var cs = tg && tg.CloudStorage && typeof tg.CloudStorage.setItem === 'function' ? tg.CloudStorage : null;
-      if (!cs) return;
-      try { cs.setItem(WORDS_KEY, JSON.stringify(wordData), function () {}); } catch (e) {}
+      saveBig(WORDS_KEY, JSON.stringify(wordData));
     }
     function demoWords() {
       var samples = ['Опора', 'Довольно', 'Мягче', 'Своё', 'Тише', 'Благодарность'];
@@ -2274,7 +2383,11 @@
 
     // ---------- Хелперы ----------
     function byId(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i]; return null; }
-    function esc(s) { return String(s == null ? '' : s); }
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
 
     function fmtDate(dt) {
       return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
